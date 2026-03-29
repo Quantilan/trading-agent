@@ -17,7 +17,7 @@ Quantilan ("we," "us," "our") respects your privacy. This Privacy Policy explain
 - Language preference
 
 **Subscription Data:**
-- Selected plan (Start/Basic/Pro)
+- Selected plan (Start/Pro)
 - Payment transaction IDs
 - License keys generated
 - Subscription start/end dates

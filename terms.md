@@ -32,8 +32,8 @@ You must:
 
 ### 4.1 Subscription Plans
 - **Start**: Free tier with basic features
-- **Basic**: $49/month (promotional pricing may apply)
-- **Pro**: $89/month (promotional pricing may apply)
+- **Pro**: $49/month (promotional pricing may apply)
+
 
 ### 4.2 License Grant
 We grant you a limited, non-exclusive, non-transferable license to use the software for the duration of your active subscription.
