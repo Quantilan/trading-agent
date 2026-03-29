@@ -1,0 +1,52 @@
+{
+  "binance": {
+    "ccxt_id": "binanceusdm",
+    "enableRateLimit": true,
+    "rateLimit": 100,
+    "timeout": 15000,
+    "options": {
+      "adjustForTimeDifference": true,
+      "defaultType": "future",
+      "defaultSubType": "linear",
+      "fetchCurrencies": false,
+      "cache": false,
+      "warmup": false
+    }
+  },
+  "bybit": {
+    "ccxt_id": "bybit",
+    "enableRateLimit": true,
+    "rateLimit": 100,
+    "timeout": 15000,
+    "options": {
+      "adjustForTimeDifference": true,
+      "defaultType": "linear",
+      "fetchCurrencies": false,
+      "cache": false
+    }
+  },
+  "hyperliquid": {
+    "ccxt_id": "hyperliquid",
+    "enableRateLimit": true,
+    "rateLimit": 50,
+    "timeout": 15000,
+    "options": {
+      "defaultType": "swap",
+      "sandbox": false,
+      "createMarketBuyOrderRequiresPrice": false,
+      "defaultSlippage": 0.5}
+  
+  },
+  "okx": {
+    "ccxt_id": "okx",
+    "enableRateLimit": true,
+    "rateLimit": 100,
+    "timeout": 15000,
+    "options": {
+      "adjustForTimeDifference": true,
+      "defaultType": "swap",
+      "defaultSubType": "linear",
+      "cache": false
+    }
+  }
+}

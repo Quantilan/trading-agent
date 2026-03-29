@@ -1,0 +1,67 @@
+{
+  "_comment": "Edit freely. Keys are lowercase aliases, values are base symbols (no stablecoin suffix).",
+
+  "actions": {
+    "open": [
+      "открой", "открыть", "войди", "войти", "вход", "enter",
+      "buy", "long", "лонг", "short", "шорт", "sell"
+    ],
+    "close": [
+      "закрой", "закрыть", "выйди", "выйти", "выход",
+      "close", "exit", "фикс", "фиксация"
+    ],
+    "modify_sl": [
+      "перенеси стоп", "передвинь стоп", "поставь стоп",
+      "стоп на", "move sl", "set sl", "sl:", "sl="
+    ],
+    "modify_tp": [
+      "перенеси тейк", "передвинь тейк", "поставь тейк",
+      "тейк на", "move tp", "set tp", "tp:", "tp="
+    ]
+  },
+
+  "sides": {
+    "long":  ["лонг", "long", "buy", "покупка", "бай", "вверх", "up", "bull"],
+    "short": ["шорт", "short", "sell", "продажа", "шорти", "вниз", "down", "bear"]
+  },
+
+  "symbols": {
+    "btc": "BTC",  "биток": "BTC",  "bitcoin": "BTC",   "битка": "BTC",
+    "eth": "ETH",  "эфир": "ETH",   "ethereum": "ETH",  "эфира": "ETH",
+    "bnb": "BNB",  "бнб": "BNB",
+    "sol": "SOL",  "сол": "SOL",    "solana": "SOL",    "солана": "SOL",
+    "xrp": "XRP",  "рипл": "XRP",   "ripple": "XRP",    "риппл": "XRP",
+    "doge": "DOGE","додж": "DOGE",  "дога": "DOGE",
+    "ada": "ADA",  "ада": "ADA",    "cardano": "ADA",   "кардано": "ADA",
+    "avax": "AVAX","авакс": "AVAX", "avalanche": "AVAX",
+    "link": "LINK","линк": "LINK",  "chainlink": "LINK",
+    "dot": "DOT",  "дот": "DOT",    "polkadot": "DOT",  "полкадот": "DOT",
+    "matic": "MATIC","матик": "MATIC","polygon": "MATIC","полигон": "MATIC",
+    "ltc": "LTC",  "лайт": "LTC",   "litecoin": "LTC",  "лайткоин": "LTC",
+    "uni": "UNI",  "юни": "UNI",    "uniswap": "UNI",
+    "atom": "ATOM","атом": "ATOM",  "cosmos": "ATOM",   "космос": "ATOM",
+    "xlm": "XLM",  "стеллар": "XLM","stellar": "XLM",
+    "icp": "ICP",  "айсипи": "ICP",
+    "fil": "FIL",  "фил": "FIL",    "filecoin": "FIL",
+    "hbar": "HBAR","хбар": "HBAR",  "hedera": "HBAR",
+    "vet": "VET",  "вет": "VET",    "vechain": "VET",
+    "near": "NEAR","нир": "NEAR",
+    "apt": "APT",  "апт": "APT",    "aptos": "APT",     "аптос": "APT",
+    "arb": "ARB",  "арб": "ARB",    "arbitrum": "ARB",  "арбитрум": "ARB",
+    "op": "OP",    "оп": "OP",      "optimism": "OP",   "оптимизм": "OP",
+    "sui": "SUI",  "суй": "SUI",    "суи": "SUI",
+    "ton": "TON",  "тон": "TON",
+    "trx": "TRX",  "трон": "TRX",   "tron": "TRX",
+    "etc": "ETC",  "ethereum classic": "ETC", "эфириум классик": "ETC",
+    "bch": "BCH",  "bitcoin cash": "BCH",     "биткоин кэш": "BCH",
+    "aave": "AAVE","аве": "AAVE",
+    "inj": "INJ",  "инж": "INJ",    "injective": "INJ", "инджектив": "INJ"
+  },
+
+  "size_keywords": {
+    "полный": 100,
+    "всё":    100,
+    "половина": 50,
+    "треть":    33
+  }
+}
