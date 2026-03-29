@@ -259,8 +259,8 @@ The agent itself is open source and free to use with your own signal sources.
 | Plan | Signals | Exchanges |
 |------|---------|-----------|
 | 🌱 Start | Custom (any Telegram channel via personal bot) | All |
-| ⚡ Basic | Quantilan strategies | All |
-| 🚀 Pro   | Quantilan strategies + priority access | All |
+| ⚡ Pro | Start + 1 Quantilan strategy (any) | All |
+
 
 Subscribe via [@quantilan_bot](https://t.me/quantilan_bot)
 
@@ -273,9 +273,8 @@ Subscribe via [@quantilan_bot](https://t.me/quantilan_bot)
 - [x] Signal parsing — regex + LLM (Claude)
 - [x] Forwarded message support (Telegram Premium)
 - [x] SL/TP validation and trailing stop protection
-- [ ] GUI utility (ships with the agent — no separate install)
+- [x] GUI utility (ships with the agent — no separate install)
 - [ ] Docker Compose deployment
-- [ ] Multi-agent support (run strategies on multiple exchanges simultaneously)
 
 ---
 
