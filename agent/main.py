@@ -65,7 +65,7 @@ class TradingAgent:
 
         self.executor = OrderExecutor(config)
         self.risk     = RiskManager(config)
-        self.notifier = Notifier(config.tg_token, config.tg_chat_id, config.mode)
+        self.notifier = Notifier(config.tg_token, config.tg_chat_id, config.mode, config.exchange)
         self.license  = LicenseChecker(
             config.license_key,
             config.license_check_interval,
@@ -200,6 +200,41 @@ class TradingAgent:
             await self.personal_bot.notify(text)
         else:
             await self.notifier.send(text)
+
+    async def _notify_with_chart(self, event: str, pos: Position) -> None:
+        """
+        Generate candlestick chart then send notification with it.
+        Runs as a fire-and-forget task — never blocks order execution.
+
+        event: 'open' | 'close' | 'modify_sl'
+        For modify_sl: pos.stop_price must already contain the NEW stop.
+        """
+        from .chart import draw_chart
+        logger = logging.getLogger(__name__)
+        chart: Optional[bytes] = None
+        try:
+            stbc   = self.config.stbc or 'USDT'
+            base   = pos.symbol.upper()
+            for s in ('USDT', 'USDC', 'BUSD'):
+                if base.endswith(s):
+                    base = base[:-len(s)]
+                    break
+            ohlcv = await self.executor.fetch_ohlcv(
+                pos.symbol, self.config.chart_tf, self.config.chart_bars
+            )
+            chart = draw_chart(
+                ohlcv, pos, event,
+                self.config.exchange, self.config.chart_tf, base
+            )
+        except Exception as e:
+            logger.warning(f"[Chart] {pos.symbol} {event}: {e}")
+
+        if event == 'open':
+            await self.notifier.on_open(pos, chart)
+        elif event == 'close':
+            await self.notifier.on_close(pos, chart)
+        elif event == 'modify_sl':
+            await self.notifier.on_modify_sl(pos, chart)
 
     # ─────────────────────────────────────
     # SIGNAL PROCESSING
@@ -342,7 +377,7 @@ class TradingAgent:
         self.monitor.add_position(position)
 
         logger.info(f"✅ [{signal.symbol}] Position opened {signal.action} @ {entry_price}")
-        await self.notifier.on_open(position)
+        asyncio.create_task(self._notify_with_chart('open', position))
 
     # ─────────────────────────────────────
     # EXIT POSITION (by signal)
@@ -380,7 +415,7 @@ class TradingAgent:
             self.monitor.remove_position(signal.symbol)
             self.state.remove_position(signal.symbol)
             logger.info(f"⏹ [{signal.symbol}] Closed by signal | rPnL: {position.rpnl:+.2f}$")
-            await self.notifier.on_close(position)
+            asyncio.create_task(self._notify_with_chart('close', position))
         finally:
             self._closing_symbols.discard(signal.symbol)
 
@@ -406,11 +441,11 @@ class TradingAgent:
             await self.notifier.on_error(f"ModifySL {signal.symbol}: {err}")
             return
 
-        await self.notifier.on_modify_sl(position, new_stop)
         position.stop_price = new_stop
         if new_stop_id:
             position.stop_id = new_stop_id
         self.state.set_position(position)
+        asyncio.create_task(self._notify_with_chart('modify_sl', position))
 
     # ─────────────────────────────────────
     # MODIFY TAKE PROFIT (by signal)
@@ -515,7 +550,7 @@ class TradingAgent:
             f"{emoji} [{symbol}] {reason.upper()} hit @ {close_price:.4f} "
             f"| rPnL: {position.rpnl:+.2f}$"
         )
-        await self.notifier.on_close(position)
+        asyncio.create_task(self._notify_with_chart('close', position))
 
     # ─────────────────────────────────────
     # PNL UPDATER (background cache)

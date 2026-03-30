@@ -43,6 +43,8 @@ ENV_DEFAULTS: Dict[str, str] = {
     "LLM_API_KEY":            "",
     "LLM_MODEL":              "",
     "LOG_LEVEL":              "INFO",  # kept for agent runtime, not shown in UI
+    "CHART_TF":               "15m",
+    "CHART_BARS":             "50",
 }
 
 

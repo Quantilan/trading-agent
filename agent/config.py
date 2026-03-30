@@ -72,6 +72,10 @@ class AgentConfig:
     llm_api_key:            str   = ""
     llm_model:              str   = ""       # auto if empty
 
+    # Chart notifications
+    chart_tf:   str = "15m"  # timeframe for chart candles
+    chart_bars: int = 50     # number of candles (25–100)
+
     # Internal
     license_check_interval: int = 21600  # seconds (6 hours)
     reconnect_delay:        int = 5      # seconds between reconnects
@@ -109,6 +113,8 @@ def load_config() -> AgentConfig:
         llm_provider            = os.getenv("LLM_PROVIDER", "none").lower().strip(),
         llm_api_key             = os.getenv("LLM_API_KEY", ""),
         llm_model               = os.getenv("LLM_MODEL", ""),
+        chart_tf    = os.getenv("CHART_TF", "15m").strip(),
+        chart_bars  = max(25, min(100, int(os.getenv("CHART_BARS", "50") or "50"))),
         log_level           = os.getenv("LOG_LEVEL", "INFO").upper(),
     )
 

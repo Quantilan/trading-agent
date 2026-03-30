@@ -546,6 +546,19 @@ class OrderExecutor:
             logger.error(f"❌ [Executor] get_ticker {symbol}: {e}")
             return 0.0
 
+    async def fetch_ohlcv(self, symbol: str, tf: str = '15m', limit: int = 50) -> list:
+        """
+        Fetch OHLCV candles for chart generation.
+        Returns [[timestamp_ms, open, high, low, close, volume], ...]
+        """
+        try:
+            ms    = self._ms(symbol)
+            ohlcv = await self.exchange.fetch_ohlcv(ms, tf, limit=limit)
+            return ohlcv or []
+        except Exception as e:
+            logger.warning(f"[Executor] fetch_ohlcv {symbol} {tf}: {e}")
+            return []
+
     # ─────────────────────────────────────
     # MARKET PARAMS
     # ─────────────────────────────────────

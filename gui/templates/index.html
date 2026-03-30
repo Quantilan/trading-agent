@@ -239,6 +239,13 @@ input[type=range]::-webkit-slider-thumb {
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.btn-tf {
+  padding: 5px 14px; border-radius: 6px; font-size: 12px; font-weight: 600;
+  border: 1px solid var(--border); background: transparent; color: var(--muted);
+  cursor: pointer; transition: all .2s;
+}
+.btn-tf:hover { border-color: var(--accent); color: var(--accent); }
+.btn-tf.active { background: rgba(0,255,148,.12); border-color: var(--accent); color: var(--accent); }
 
 /* ── Result badges ── */
 .result-row {
@@ -602,6 +609,45 @@ input[type=range]::-webkit-slider-thumb {
       </div>
     </div>
 
+    <!-- Chart & Advanced -->
+    <div class="card collapsed" id="card-advanced">
+      <div class="card-header" onclick="toggleCard(this)">
+        <span class="icon">⚙️</span> Chart &amp; Advanced
+        <span class="toggle-icon">▶</span>
+      </div>
+      <div class="card-body">
+
+        <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:12px">Chart Notifications</div>
+
+        <!-- Chart Timeframe -->
+        <div class="field-group" style="margin-bottom:16px">
+          <label class="field-label">Chart Timeframe</label>
+          <div style="display:flex; gap:8px; flex-wrap:wrap">
+            <button type="button" class="btn-tf" data-val="5m"  onclick="setChartTF(this)">5m</button>
+            <button type="button" class="btn-tf active" data-val="15m" onclick="setChartTF(this)">15m</button>
+            <button type="button" class="btn-tf" data-val="1h"  onclick="setChartTF(this)">1h</button>
+            <button type="button" class="btn-tf" data-val="4h"  onclick="setChartTF(this)">4h</button>
+          </div>
+          <input type="hidden" id="CHART_TF" value="15m">
+          <div style="font-size:11px; color:var(--muted); margin-top:6px">Timeframe of candles in Telegram chart notifications</div>
+        </div>
+
+        <!-- Chart Bars -->
+        <div class="field-group">
+          <label class="field-label">Chart Candles</label>
+          <div style="display:flex; gap:8px; flex-wrap:wrap">
+            <button type="button" class="btn-tf" data-val="25"  onclick="setChartBars(this)">25</button>
+            <button type="button" class="btn-tf active" data-val="50"  onclick="setChartBars(this)">50</button>
+            <button type="button" class="btn-tf" data-val="75"  onclick="setChartBars(this)">75</button>
+            <button type="button" class="btn-tf" data-val="100" onclick="setChartBars(this)">100</button>
+          </div>
+          <input type="hidden" id="CHART_BARS" value="50">
+          <div style="font-size:11px; color:var(--muted); margin-top:6px">Number of candles displayed on chart (25–100)</div>
+        </div>
+
+      </div>
+    </div>
+
     <!-- Save & Launch -->
     <div class="card">
       <div class="card-body">
@@ -894,6 +940,10 @@ async function loadConfig() {
       }
     }
 
+    // Chart settings
+    if (f.CHART_TF)   applyChartTF(f.CHART_TF);
+    if (f.CHART_BARS) applyChartBars(f.CHART_BARS);
+
     onExchangeChange();
     onParserModeChange();
 
@@ -1009,6 +1059,36 @@ function toggleCard(header) {
   body.classList.toggle('hidden');
 }
 
+// ── Chart TF / Bars button selectors ─────────────────────────────────────────
+function setChartTF(btn) {
+  document.querySelectorAll('.btn-tf[data-val]').forEach(b => {
+    if (['5m','15m','1h','4h'].includes(b.dataset.val)) b.classList.remove('active');
+  });
+  btn.classList.add('active');
+  document.getElementById('CHART_TF').value = btn.dataset.val;
+}
+function setChartBars(btn) {
+  document.querySelectorAll('.btn-tf[data-val]').forEach(b => {
+    if (['25','50','75','100'].includes(b.dataset.val)) b.classList.remove('active');
+  });
+  btn.classList.add('active');
+  document.getElementById('CHART_BARS').value = btn.dataset.val;
+}
+function applyChartTF(val) {
+  document.querySelectorAll('.btn-tf[data-val]').forEach(b => {
+    if (['5m','15m','1h','4h'].includes(b.dataset.val))
+      b.classList.toggle('active', b.dataset.val === val);
+  });
+  document.getElementById('CHART_TF').value = val;
+}
+function applyChartBars(val) {
+  document.querySelectorAll('.btn-tf[data-val]').forEach(b => {
+    if (['25','50','75','100'].includes(b.dataset.val))
+      b.classList.toggle('active', b.dataset.val === val);
+  });
+  document.getElementById('CHART_BARS').value = val;
+}
+
 // ── Collect form data ─────────────────────────────────────────────────────────
 function collectFields() {
   const ex  = document.getElementById('EXCHANGE').value;
@@ -1035,6 +1115,8 @@ function collectFields() {
     LLM_PROVIDER:           el('LLM_PROVIDER'),
     LLM_API_KEY:  el('LLM_API_KEY'),
     LLM_MODEL:    el('LLM_MODEL'),
+    CHART_TF:     el('CHART_TF')   || '15m',
+    CHART_BARS:   el('CHART_BARS') || '50',
   };
   return fields;
 }

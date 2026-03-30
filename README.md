@@ -4,6 +4,7 @@
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Status](https://img.shields.io/badge/status-active%20development-success)](#)
+[![License: BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-orange.svg)](LICENSE)
 
 > ⚡ **First stable version will be ready in May 2026**
 
@@ -119,6 +120,7 @@ Open **http://localhost:8080** (or your VPS IP).
 | **Risk Management** | Margin per trade %, leverage, max positions, default SL % |
 | **Telegram Bot** | Bot token from @BotFather, your Chat ID from @userinfobot |
 | **Signal & Notifications** | Signal source (Quantilan Server / Telegram), license key, parser mode |
+| **Chart & Advanced** *(collapsed)* | Chart timeframe (5m/15m/1h/4h) and number of candles (25/50/75/100) for Telegram chart notifications |
 
 ### Right column — Tests & Status
 
@@ -214,6 +216,10 @@ PARSER_MODE=regex         # regex | llm
 CONFIRM_TRADE=true
 # LLM_PROVIDER=claude
 # LLM_API_KEY=sk-ant-...
+
+# ── Chart notifications ────────────────────────────────────
+CHART_TF=15m              # 5m | 15m | 1h | 4h
+CHART_BARS=50             # 25 | 50 | 75 | 100
 ```
 
 ---
