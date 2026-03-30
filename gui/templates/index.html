@@ -395,6 +395,27 @@ input[type=range]::-webkit-slider-thumb {
 }
 .modal-warn-item .wi-icon { flex-shrink: 0; }
 .modal-btn-row { display: flex; gap: 10px; margin-top: 18px; }
+
+.tg-link {
+  color: #0088cc;
+  text-decoration: none;
+  font-weight: 500;
+  padding: 1px 4px;
+  border-radius: 3px;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.tg-link:hover {
+  background: #0088cc;
+  color: white;
+  text-decoration: none;
+}
+
+.tg-link::before {
+  content: "✈ ";
+  font-size: 0.9em;
+}
 </style>
 </head>
 <body>
@@ -631,18 +652,25 @@ input[type=range]::-webkit-slider-thumb {
         <div class="field">
           <label>Bot Token <span class="status-dot empty" id="s-TG_TOKEN"></span></label>
           <input type="password" id="TG_TOKEN" placeholder="123456789:ABCdef..."
-                 oninput="onSecretInput('TG_TOKEN')">
+                oninput="onSecretInput('TG_TOKEN')">
           <div style="font-size:13px; color:var(--muted); margin-top:4px">
-            Create bot via <code>@BotFather</code> → /newbot
+            Create bot via 
+            <a href="https://t.me/BotFather" target="_blank" class="tg-link">
+              @BotFather
+            </a>
+            → <code>/newbot</code>
           </div>
         </div>
 
         <div class="field">
           <label>Your Chat ID <span class="status-dot empty" id="s-TG_CHAT_ID"></span></label>
           <input type="text" id="TG_CHAT_ID" placeholder="1234567890"
-                 oninput="onSecretInput('TG_CHAT_ID')">
+                oninput="onSecretInput('TG_CHAT_ID')">
           <div style="font-size:13px; color:var(--muted); margin-top:4px">
-            Get it from <code>@userinfobot</code>
+            Get it from 
+            <a href="https://t.me/userinfobot" target="_blank" class="tg-link">
+              @userinfobot
+            </a>
           </div>
         </div>
 
@@ -655,7 +683,6 @@ input[type=range]::-webkit-slider-thumb {
 
       </div>
     </div>
-
     <!-- Signal & Notifications -->
     <div class="card">
       <div class="card-header" onclick="toggleCard(this)">
@@ -681,8 +708,14 @@ input[type=range]::-webkit-slider-thumb {
         <div id="server-fields" style="display:none; margin-top:14px">
           <div class="field">
             <label>License Key <span class="status-dot empty" id="s-LICENSE_KEY"></span></label>
-            <input type="text" id="LICENSE_KEY" placeholder="XXXX-XXXX-XXXX-XXXX"
-                   oninput="onSecretInput('LICENSE_KEY')">
+            <input type="password" id="LICENSE_KEY" placeholder="WBCK...UBXN"
+                  oninput="onSecretInput('LICENSE_KEY')">
+            <div style="font-size:13px; color:var(--muted); margin-top:4px">
+              Get license from 
+              <a href="https://t.me/quantilan_bot" target="_blank" class="tg-link">
+                @quantilan_bot
+              </a>
+            </div>
           </div>
           <div class="field">
             <label>Signal Server URL</label>
