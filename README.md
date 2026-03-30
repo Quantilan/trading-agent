@@ -10,6 +10,25 @@
 
 ---
 
+## ⚡ Quick Start
+
+```bash
+git clone https://github.com/Quantilan/trading-agent.git
+cd trading-agent
+make setup   # create .env and state files
+make gui     # start Setup GUI
+```
+
+Open **http://localhost:8080** — configure, test connections, start the agent. That's it.
+
+```bash
+make start   # run agent in background (detached)
+make logs    # tail live logs
+make stop    # stop agent
+```
+
+---
+
 ## Overview
 
 Quantilan Trading Agent is an autonomous cryptocurrency trading bot that runs on **your** infrastructure (VPS, Mac Mini, home server). You maintain full control of your API keys and funds at all times.
