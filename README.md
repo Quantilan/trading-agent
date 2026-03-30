@@ -12,6 +12,19 @@
 
 ## ⚡ Quick Start
 
+### 🪟 Very simple test (recommended for Windows)
+
+1. Download ZIP:  
+   👉 https://github.com/Quantilan/trading-agent/archive/refs/heads/main.zip
+
+2. Unzip the `trading-agent` folder
+
+3. Double-click `start.bat`
+
+✅ Done! The GUI will open and the bot will start.
+
+###  Makefile 
+
 ```bash
 git clone https://github.com/Quantilan/trading-agent.git
 cd trading-agent
@@ -26,7 +39,6 @@ make start   # run agent in background (detached)
 make logs    # tail live logs
 make stop    # stop agent
 ```
-
 ---
 
 ## Overview

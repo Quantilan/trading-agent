@@ -139,7 +139,7 @@ def _validate(cfg: AgentConfig) -> None:
         if not cfg.signal_server:
             errors.append("SIGNAL_SERVER is required for SIGNAL_SOURCE=server")
 
-    if cfg.llm_provider not in ("none", "claude"):
+    if cfg.parser_mode!='regex' and cfg.llm_provider not in ("none", "claude"):
         logger.warning(f"⚠️  Unknown LLM_PROVIDER='{cfg.llm_provider}' — using 'none'")
         cfg.llm_provider = "none"
     if cfg.llm_provider == "claude" and not cfg.llm_api_key:
@@ -150,22 +150,22 @@ def _validate(cfg: AgentConfig) -> None:
         errors.append(f"EXCHANGE must be one of: {', '.join(SUPPORTED_EXCHANGES)}")
 
     # Exchange credentials
-    if cfg.exchange == 'hyperliquid':
+    if cfg.exchange == 'hyperliquid' and cfg.mode == 'trade':
         if not cfg.wallet_address:
             errors.append("EXCHANGE_WALLET_ADDRESS is required for Hyperliquid")
         if not cfg.api_secret:
             errors.append("EXCHANGE_SECRET (private key) is required for Hyperliquid")
-    elif cfg.exchange == 'okx':
+    elif cfg.exchange == 'okx' and cfg.mode == 'trade':
         if not cfg.api_key:
             errors.append("EXCHANGE_API_KEY is not set")
-        if not cfg.api_secret:
+        if not cfg.api_secret and cfg.mode == 'trade':
             errors.append("EXCHANGE_SECRET is not set")
-        if not cfg.api_passphrase:
+        if not cfg.api_passphrase and cfg.mode == 'trade':
             errors.append("EXCHANGE_PASSPHRASE is required for OKX")
     else:
-        if not cfg.api_key:
+        if not cfg.api_key and cfg.mode == 'trade':
             errors.append("EXCHANGE_API_KEY is not set")
-        if not cfg.api_secret:
+        if not cfg.api_secret and cfg.mode == 'trade':
             errors.append("EXCHANGE_SECRET is not set")
 
     # Risk management
