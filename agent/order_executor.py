@@ -553,8 +553,14 @@ class OrderExecutor:
         """
         try:
             ms    = self._ms(symbol)
-            ohlcv = await self.exchange.fetch_ohlcv(ms, tf, limit=limit)
+            ohlcv = await asyncio.wait_for(
+                self.exchange.fetch_ohlcv(ms, tf, limit=limit),
+                timeout=15.0,
+            )
             return ohlcv or []
+        except asyncio.TimeoutError:
+            logger.warning(f"[Executor] fetch_ohlcv {symbol} {tf}: timeout")
+            return []
         except Exception as e:
             logger.warning(f"[Executor] fetch_ohlcv {symbol} {tf}: {e}")
             return []
@@ -600,6 +606,8 @@ class OrderExecutor:
     # ─────────────────────────────────────
 
     async def set_leverage(self, symbol: str, leverage: int) -> bool:
+        if self.config.mode == "paper":
+            return True  # no-op in paper mode
         async with self._semaphore:
             try:
                 ms = self._ms(symbol)

@@ -15,18 +15,22 @@ if TYPE_CHECKING:
     from agent.state import Position, PositionSide
 
 
+MAX_SL_PCT = 0.50  # SL can't be more than 50% away from entry
+
 def validate_open_sl(side: str, entry: float, sl: float) -> Tuple[bool, str]:
     """Validate stop-loss price for a new position."""
     if sl <= 0:
         return True, ""
-    if side == "LONG" and sl >= entry:
-        return False, (
-            f"SL ${sl:.4f} must be <b>below</b> entry ${entry:.4f} for LONG"
-        )
-    if side == "SHORT" and sl <= entry:
-        return False, (
-            f"SL ${sl:.4f} must be <b>above</b> entry ${entry:.4f} for SHORT"
-        )
+    if side == "LONG":
+        if sl >= entry:
+            return False, f"SL ${sl:.4f} must be <b>below</b> entry ${entry:.4f} for LONG"
+        if (entry - sl) / entry > MAX_SL_PCT:
+            return False, f"SL ${sl:.4f} is more than 50% below entry ${entry:.4f}"
+    if side == "SHORT":
+        if sl <= entry:
+            return False, f"SL ${sl:.4f} must be <b>above</b> entry ${entry:.4f} for SHORT"
+        if (sl - entry) / entry > MAX_SL_PCT:
+            return False, f"SL ${sl:.4f} is more than 50% above entry ${entry:.4f}"
     return True, ""
 
 

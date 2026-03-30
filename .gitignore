@@ -5,7 +5,7 @@
 
 # Database & state
 *.db
-agent_state.json
+state_*.json
 
 # Python
 __pycache__/

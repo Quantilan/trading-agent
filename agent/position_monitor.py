@@ -221,7 +221,9 @@ class PositionMonitor:
                     continue
 
                 for trade in trades:
-                    price = float(trade['price'])
+                    price = float(trade.get('price') or 0)
+                    if price <= 0:
+                        continue
                     if high == 0.0:
                         high = low = price
                     else:

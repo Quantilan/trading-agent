@@ -22,6 +22,7 @@ import logging
 import os
 import sys
 import uuid
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -36,7 +37,23 @@ sys.path.insert(0, str(_ROOT))
 
 from gui.env_manager import read_env, write_env, validate_field, ENV_DEFAULTS
 
-app = FastAPI(title="Quantilan Agent Setup", docs_url=None, redoc_url=None)
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    yield
+    # On shutdown: terminate agent subprocess so Ctrl+C doesn't hang
+    global _agent_proc
+    if _agent_proc and _agent_proc.returncode is None:
+        try:
+            _agent_proc.terminate()
+            await asyncio.wait_for(_agent_proc.wait(), timeout=3.0)
+        except asyncio.TimeoutError:
+            _agent_proc.kill()
+        except Exception:
+            pass
+
+
+app = FastAPI(title="Quantilan Agent Setup", docs_url=None, redoc_url=None, lifespan=_lifespan)
 
 # Static files
 _STATIC = Path(__file__).parent / "static"
@@ -51,6 +68,7 @@ _active_tests: Dict[str, asyncio.Queue] = {}
 # Agent subprocess
 _agent_proc: Optional[asyncio.subprocess.Process] = None
 _agent_log_queue: asyncio.Queue = asyncio.Queue(maxsize=500)
+_agent_paused: bool = False
 
 
 # ── Request/Response models ──────────────────────────────────────────────────
@@ -192,7 +210,15 @@ async def get_config():
 @app.post("/api/save")
 async def save_config(req: SaveRequest):
     try:
-        write_env(req.fields)
+        # If a field still contains the masked placeholder (user never edited it),
+        # restore the real value from the current .env so we never overwrite secrets
+        # with their own masks.
+        fields   = dict(req.fields)
+        existing = read_env()
+        for k, v in fields.items():
+            if _is_masked(v) and existing.get(k):
+                fields[k] = existing[k]
+        write_env(fields)
         return {"ok": True, "message": ".env saved successfully"}
     except Exception as e:
         raise HTTPException(500, str(e))
@@ -200,19 +226,42 @@ async def save_config(req: SaveRequest):
 
 @app.post("/api/test/connection")
 async def test_connection(req: TestConnectionRequest):
-    """Quick test: connect to exchange and get balance."""
+    """Quick test: connect to exchange and get balance.
+    In paper mode connects anonymously (public endpoints only — no API keys needed).
+    """
     try:
         from agent.order_executor import OrderExecutor
-        config   = _build_config(_unmask_fields(req.fields))
+        fields = _unmask_fields(req.fields)
+        mode   = fields.get("MODE", "paper")
+
+        # Paper mode: strip credentials so CCXT uses public endpoints only
+        if mode == "paper":
+            fields = {**fields, "EXCHANGE_API_KEY": "", "EXCHANGE_SECRET": "",
+                      "EXCHANGE_PASSPHRASE": "", "EXCHANGE_WALLET_ADDRESS": ""}
+
+        config   = _build_config(fields)
         executor = OrderExecutor(config)
 
         ok = await executor.connect()
         if not ok:
             return {"ok": False, "error": f"connect() returned False — check logs for [{config.exchange.upper()}] error details"}
 
-        total, free, used = await executor.get_balance()
         stbc = config.stbc or "USDT"
-        pos_mode = await executor.get_position_mode() if config.mode == "trade" else "paper"
+
+        if mode == "paper":
+            # Return paper balance; no authenticated balance call needed
+            paper_bal = config.paper_balance
+            await executor.disconnect()
+            return {
+                "ok":       True,
+                "exchange": config.exchange.upper(),
+                "balance":  {"total": paper_bal, "free": paper_bal, "used": 0.0},
+                "stbc":     stbc,
+                "pos_mode": "paper",
+            }
+
+        total, free, used = await executor.get_balance()
+        pos_mode = await executor.get_position_mode()
 
         await executor.disconnect()
         return {
@@ -420,9 +469,11 @@ async def test_signal(req: TestSignalRequest):
 
 @app.get("/api/agent/status")
 async def agent_status():
-    global _agent_proc
+    global _agent_proc, _agent_paused
     running = _agent_proc is not None and _agent_proc.returncode is None
-    return {"running": running, "pid": _agent_proc.pid if running else None}
+    if not running:
+        _agent_paused = False   # reset if process died
+    return {"running": running, "paused": _agent_paused, "pid": _agent_proc.pid if running else None}
 
 
 @app.post("/api/agent/start")
@@ -443,19 +494,53 @@ async def agent_start():
         main   = str(_ROOT / "main.py")
         _agent_proc = await asyncio.create_subprocess_exec(
             python, main,
+            stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
             cwd=str(_ROOT),
         )
+        _agent_paused = False
         asyncio.create_task(_read_agent_output())
         return {"ok": True, "pid": _agent_proc.pid}
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
 
+@app.post("/api/agent/pause")
+async def agent_pause():
+    global _agent_proc, _agent_paused
+    if not _agent_proc or _agent_proc.returncode is not None:
+        return {"ok": False, "error": "Agent is not running"}
+    if _agent_paused:
+        return {"ok": False, "error": "Already paused"}
+    try:
+        _agent_proc.stdin.write(b"pause\n")
+        await _agent_proc.stdin.drain()
+        _agent_paused = True
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/api/agent/resume")
+async def agent_resume():
+    global _agent_proc, _agent_paused
+    if not _agent_proc or _agent_proc.returncode is not None:
+        return {"ok": False, "error": "Agent is not running"}
+    if not _agent_paused:
+        return {"ok": False, "error": "Not paused"}
+    try:
+        _agent_proc.stdin.write(b"resume\n")
+        await _agent_proc.stdin.drain()
+        _agent_paused = False
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 @app.post("/api/agent/stop")
 async def agent_stop():
-    global _agent_proc
+    global _agent_proc, _agent_paused
     if not _agent_proc or _agent_proc.returncode is not None:
         return {"ok": False, "error": "Agent is not running"}
     try:
@@ -463,6 +548,7 @@ async def agent_stop():
         await asyncio.wait_for(_agent_proc.wait(), timeout=5.0)
     except asyncio.TimeoutError:
         _agent_proc.kill()
+    _agent_paused = False
     return {"ok": True}
 
 

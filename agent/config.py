@@ -107,10 +107,10 @@ def load_config() -> AgentConfig:
         paper_balance       = float(os.getenv("PAPER_BALANCE", "10000") or "10000"),
         tg_token            = os.getenv("TG_TOKEN", ""),
         tg_chat_id          = int(os.getenv("TG_CHAT_ID", "0") or "0"),
-        parser_mode             = os.getenv("PARSER_MODE", "regex").lower().strip(),
+        parser_mode             = (os.getenv("PARSER_MODE") or "regex").lower().strip(),
         confirm_trade           = os.getenv("CONFIRM_TRADE", "true").lower() != "false",
         default_sl_pct          = float(os.getenv("DEFAULT_SL_PCT", "2.0")),
-        llm_provider            = os.getenv("LLM_PROVIDER", "none").lower().strip(),
+        llm_provider            = (os.getenv("LLM_PROVIDER") or "none").lower().strip(),
         llm_api_key             = os.getenv("LLM_API_KEY", ""),
         llm_model               = os.getenv("LLM_MODEL", ""),
         chart_tf    = os.getenv("CHART_TF", "15m").strip(),
@@ -140,9 +140,11 @@ def _validate(cfg: AgentConfig) -> None:
             errors.append("SIGNAL_SERVER is required for SIGNAL_SOURCE=server")
 
     if cfg.llm_provider not in ("none", "claude"):
-        errors.append("LLM_PROVIDER must be 'none' or 'claude'")
+        logger.warning(f"⚠️  Unknown LLM_PROVIDER='{cfg.llm_provider}' — using 'none'")
+        cfg.llm_provider = "none"
     if cfg.llm_provider == "claude" and not cfg.llm_api_key:
-        errors.append("LLM_API_KEY is required when LLM_PROVIDER=claude")
+        logger.warning("⚠️  LLM_PROVIDER=claude but LLM_API_KEY not set — LLM disabled")
+        cfg.llm_provider = "none"
 
     if cfg.exchange not in SUPPORTED_EXCHANGES:
         errors.append(f"EXCHANGE must be one of: {', '.join(SUPPORTED_EXCHANGES)}")

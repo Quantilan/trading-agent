@@ -26,7 +26,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 15px;
+  font-size: 17px;
   min-height: 100vh;
 }
 
@@ -42,31 +42,31 @@ header {
   top: 0;
   z-index: 100;
 }
-header .logo { font-size: 19px; font-weight: 700; color: var(--accent); }
-header .sub  { color: var(--muted); font-size: 14px; }
+header .logo { font-size: 21px; font-weight: 700; color: var(--accent); }
+header .sub  { color: var(--muted); font-size: 16px; }
 header .spacer { flex: 1; }
 #agent-status-badge {
   padding: 4px 12px;
   border-radius: 20px;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   background: #21262d;
   border: 1px solid var(--border);
 }
 #agent-status-badge.running { background: rgba(63,185,80,.15); border-color: var(--green); color: var(--green); }
+#agent-status-badge.paused  { background: rgba(210,153,34,.15); border-color: var(--yellow); color: var(--yellow); }
 #agent-status-badge.stopped { color: var(--muted); }
+.btn-yellow { background: transparent; border: 1px solid var(--yellow); color: var(--yellow); }
+.btn-yellow:hover { background: rgba(210,153,34,.1); }
+.btn-tested { background: rgba(63,185,80,.08); border: 1px solid rgba(63,185,80,.35); color: var(--green); }
+.btn-tested:hover { background: rgba(63,185,80,.15); }
 
 /* ── Layout ── */
 .layout {
-  display: grid;
-  grid-template-columns: 1fr 380px;
-  gap: 20px;
+  display: block;
   padding: 20px 24px;
-  max-width: 1300px;
+  max-width: 860px;
   margin: 0 auto;
-}
-@media (max-width: 900px) {
-  .layout { grid-template-columns: 1fr; }
 }
 
 /* ── Card ── */
@@ -82,14 +82,14 @@ header .spacer { flex: 1; }
   background: var(--surface2);
   border-bottom: 1px solid var(--border);
   font-weight: 600;
-  font-size: 14px;
+  font-size: 16px;
   display: flex;
   align-items: center;
   gap: 8px;
   cursor: pointer;
   user-select: none;
 }
-.card-header .icon { font-size: 15px; }
+.card-header .icon { font-size: 17px; }
 .card-header .chevron { margin-left: auto; transition: transform .2s; color: var(--muted); }
 .card-header.collapsed .chevron { transform: rotate(-90deg); }
 .card-body { padding: 16px; }
@@ -103,7 +103,7 @@ label {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: 15px;
   color: var(--muted);
   margin-bottom: 5px;
   font-weight: 500;
@@ -118,7 +118,7 @@ input[type=text], input[type=password], input[type=number], select, textarea {
   border-radius: 6px;
   padding: 8px 10px;
   color: var(--text);
-  font-size: 14px;
+  font-size: 16px;
   font-family: inherit;
   outline: none;
   transition: border-color .15s;
@@ -145,7 +145,7 @@ select option { background: var(--surface); }
 .slider-label {
   display: flex;
   justify-content: space-between;
-  font-size: 13px;
+  font-size: 15px;
   color: var(--muted);
   margin-bottom: 6px;
   text-transform: uppercase;
@@ -153,7 +153,7 @@ select option { background: var(--surface); }
   font-weight: 500;
 }
 .slider-value {
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 700;
   color: var(--text);
   min-width: 42px;
@@ -196,7 +196,7 @@ input[type=range]::-webkit-slider-thumb {
   border: 1px solid var(--border);
   border-radius: 6px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 16px;
   transition: all .15s;
   user-select: none;
 }
@@ -215,7 +215,7 @@ input[type=range]::-webkit-slider-thumb {
   padding: 8px 16px;
   border-radius: 6px;
   border: none;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 500;
   cursor: pointer;
   transition: opacity .15s, transform .05s;
@@ -240,7 +240,7 @@ input[type=range]::-webkit-slider-thumb {
 
 .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 .btn-tf {
-  padding: 5px 14px; border-radius: 6px; font-size: 12px; font-weight: 600;
+  padding: 5px 14px; border-radius: 6px; font-size: 14px; font-weight: 600;
   border: 1px solid var(--border); background: transparent; color: var(--muted);
   cursor: pointer; transition: all .2s;
 }
@@ -255,7 +255,7 @@ input[type=range]::-webkit-slider-thumb {
   padding: 8px 10px;
   border-radius: 6px;
   margin-bottom: 8px;
-  font-size: 14px;
+  font-size: 16px;
   background: var(--surface2);
   border: 1px solid var(--border);
 }
@@ -273,7 +273,7 @@ input[type=range]::-webkit-slider-thumb {
   border-radius: 6px;
   padding: 10px;
   font-family: "Cascadia Code", "Fira Code", monospace;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.6;
   height: 280px;
   overflow-y: auto;
@@ -298,7 +298,7 @@ input[type=range]::-webkit-slider-thumb {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 12px 18px;
-  font-size: 14px;
+  font-size: 16px;
   opacity: 0;
   transform: translateY(10px);
   transition: all .25s;
@@ -316,18 +316,42 @@ input[type=range]::-webkit-slider-thumb {
 /* ── Section visibility ── */
 .exchange-only { display: none; }
 
+/* ── Inline test chips ── */
+.test-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.test-chip {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.test-chip.ok   { color: var(--green);  border-color: rgba(63,185,80,.35);  background: rgba(63,185,80,.08); }
+.test-chip.fail { color: var(--red);    border-color: rgba(248,81,73,.35);  background: rgba(248,81,73,.07); }
+.test-chip.warn { color: var(--yellow); border-color: rgba(210,153,34,.35); background: rgba(210,153,34,.07); }
+
 /* ── Readiness checklist ── */
 .chk-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 15px;
   color: var(--muted);
   transition: color .2s;
 }
 .chk-item.done  { color: var(--green); }
 .chk-item.fail  { color: var(--red); }
-.chk-icon { font-size: 15px; line-height: 1; }
+.chk-icon { font-size: 17px; line-height: 1; }
 
 /* ── Start warning modal ── */
 #start-modal {
@@ -339,7 +363,16 @@ input[type=range]::-webkit-slider-thumb {
   align-items: center;
   justify-content: center;
 }
-#start-modal.open { display: flex; }
+#start-modal.open, #kill-modal.open { display: flex; }
+#kill-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.65);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+}
 .modal-box {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -348,7 +381,7 @@ input[type=range]::-webkit-slider-thumb {
   max-width: 460px;
   width: 90%;
 }
-.modal-box h3 { font-size: 16px; margin-bottom: 14px; }
+.modal-box h3 { font-size: 18px; margin-bottom: 14px; }
 .modal-warn-item {
   display: flex;
   gap: 10px;
@@ -357,7 +390,7 @@ input[type=range]::-webkit-slider-thumb {
   background: rgba(248,81,73,.07);
   border: 1px solid rgba(248,81,73,.25);
   border-radius: 6px;
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.5;
 }
 .modal-warn-item .wi-icon { flex-shrink: 0; }
@@ -387,6 +420,58 @@ input[type=range]::-webkit-slider-thumb {
       <div class="card-body">
 
         <div class="field">
+          <label>Trading Mode</label>
+          <div class="radio-group" id="MODE">
+            <label class="radio-btn active" onclick="setRadio('MODE','paper',this); onModeChange('paper')">
+              <input type="radio" name="MODE" value="paper" checked>
+              📋 Paper (simulated)
+            </label>
+            <label class="radio-btn" onclick="setRadio('MODE','trade',this); onModeChange('trade')">
+              <input type="radio" name="MODE" value="trade">
+              💰 Trade (real orders)
+            </label>
+          </div>
+        </div>
+
+        <!-- Paper mode notice (under mode buttons) -->
+        <div id="paper-mode-inline" style="
+          display: block;
+          background: rgba(88,166,255,.08);
+          border: 1px solid rgba(88,166,255,.3);
+          border-radius: 6px;
+          padding: 9px 12px;
+          font-size: 13px;
+          color: var(--accent);
+          margin-top: 8px;
+          line-height: 1.5;
+        ">
+          📋 <b>Paper mode</b> — no real money, no API keys needed.<br>
+          <span style="color:var(--muted)">Simulates trades using public market data. Perfect for testing your setup.</span>
+        </div>
+
+        <!-- Trade mode warning (under mode buttons) -->
+        <div id="trade-mode-inline" style="
+          display: none;
+          background: rgba(248,81,73,.07);
+          border: 1px solid rgba(248,81,73,.3);
+          border-radius: 6px;
+          padding: 9px 12px;
+          font-size: 13px;
+          color: var(--red);
+          margin-top: 8px;
+          line-height: 1.6;
+        ">
+          ⚠️ <b>Live trading — real funds at risk.</b><br>
+          <span style="color:var(--muted)">The agent will place real orders on the exchange using your API keys.
+          Only use capital you can afford to lose. By continuing you confirm that you have read and accept the
+          <a href="https://quantilan.com/legal/disclaimer.html" target="_blank"
+             style="color:var(--red); text-decoration:underline; text-underline-offset:2px">Risk Disclosure Policy</a>.</span>
+        </div>
+
+        <!-- PAPER_BALANCE not shown — default 10000, configurable directly in .env -->
+        <input type="hidden" id="PAPER_BALANCE" value="10000">
+
+        <div class="field" style="margin-top:10px">
           <label>Exchange</label>
           <select id="EXCHANGE" onchange="onExchangeChange()">
             <option value="binance">Binance USDⓈ-M Futures</option>
@@ -395,6 +480,9 @@ input[type=range]::-webkit-slider-thumb {
             <option value="okx">OKX Swap</option>
           </select>
         </div>
+
+        <!-- API keys — hidden in paper mode -->
+        <div id="api-keys-section" style="display:none">
 
         <!-- Binance / Bybit / OKX -->
         <div class="field" id="f-api-key">
@@ -417,17 +505,17 @@ input[type=range]::-webkit-slider-thumb {
         <div class="field exchange-only hl-only" id="f-wallet">
           <label>Wallet Address <span class="status-dot empty" id="s-EXCHANGE_WALLET_ADDRESS"></span></label>
           <input type="text" id="EXCHANGE_WALLET_ADDRESS" placeholder="0x..." oninput="onSecretInput('EXCHANGE_WALLET_ADDRESS')">
-          <div style="font-size:11px; color:var(--muted); margin-top:4px">Your main wallet (public address)</div>
+          <div style="font-size:13px; color:var(--muted); margin-top:4px">Your main wallet (public address)</div>
         </div>
         <div class="field exchange-only hl-only" id="f-hl-secret">
           <label>Private Key <span class="status-dot empty" id="s-EXCHANGE_SECRET_HL"></span></label>
           <input type="password" id="EXCHANGE_SECRET_HL" placeholder="0x... private key">
-          <div style="font-size:11px; color:var(--muted); margin-top:4px">Agent private key (from HL dashboard → API Keys)</div>
+          <div style="font-size:13px; color:var(--muted); margin-top:4px">Agent private key (from HL dashboard → API Keys)</div>
         </div>
         <div class="field exchange-only hl-only" id="f-hl-apikey">
           <label>Agent Address <span style="color:var(--muted);font-weight:400">(optional)</span> <span class="status-dot empty" id="s-EXCHANGE_API_KEY_HL"></span></label>
           <input type="text" id="EXCHANGE_API_KEY_HL" placeholder="0x... agent public address" oninput="onSecretInput('EXCHANGE_API_KEY_HL')">
-          <div style="font-size:11px; color:var(--muted); margin-top:4px">Public address of the API agent key</div>
+          <div style="font-size:13px; color:var(--muted); margin-top:4px">Public address of the API agent key</div>
         </div>
 
         <div class="field">
@@ -439,25 +527,48 @@ input[type=range]::-webkit-slider-thumb {
           </select>
         </div>
 
-        <div class="field" style="margin-top:6px">
-          <label>Trading Mode</label>
-          <div class="radio-group" id="MODE">
-            <label class="radio-btn active" onclick="setRadio('MODE','paper',this); onModeChange('paper')">
-              <input type="radio" name="MODE" value="paper" checked>
-              📋 Paper (simulated)
-            </label>
-            <label class="radio-btn" onclick="setRadio('MODE','trade',this); onModeChange('trade')">
-              <input type="radio" name="MODE" value="trade">
-              💰 Trade (real orders)
-            </label>
-          </div>
+        </div><!-- /api-keys-section -->
+
+        <!-- ── Connection test inline ── -->
+        <div class="test-row">
+          <button class="btn btn-primary" id="btn-conn" onclick="testConnection()">🔌 Test Public API</button>
+          <span id="ci-exchange" class="test-chip">Exchange —</span>
+          <span id="ci-balance" class="test-chip">Balance —</span>
+          <span id="ci-mode" class="test-chip">Mode —</span>
         </div>
 
-        <div id="paper-balance-row" class="field" style="margin-top:4px">
-          <label>Virtual Balance (USDT)
-            <span style="font-size:12px; color:var(--muted); font-weight:400"> — simulated deposit</span>
-          </label>
-          <input type="number" id="PAPER_BALANCE" value="10000" min="100" max="1000000" step="100" style="max-width:160px">
+        <!-- ── Order test — trade mode only ── -->
+        <div id="card-order-test" style="display:none; margin-top:14px; padding-top:14px; border-top:1px solid var(--border)">
+          <div style="font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; margin-bottom:10px">⚡ Order Test</div>
+          <div style="font-size:14px; color:var(--muted); margin-bottom:10px; line-height:1.5">Full cycle: open → modify SL → close.</div>
+          <div class="field-row" style="margin-bottom:10px">
+            <div class="field">
+              <label>Symbol</label>
+              <input type="text" id="test-symbol" value="ETH" style="text-transform:uppercase">
+            </div>
+            <div class="field">
+              <label>Side</label>
+              <select id="test-side">
+                <option value="LONG">LONG</option>
+                <option value="SHORT">SHORT</option>
+              </select>
+            </div>
+          </div>
+          <div style="padding:10px 12px;
+            background:rgba(248,81,73,.07); border:1px solid rgba(248,81,73,.3); border-radius:6px;
+            font-size:14px; color:var(--red); line-height:1.6">
+            ⚠️ <b>Real orders will be placed on the exchange.</b>
+            The test opens a position, adjusts the stop-loss, then closes it.
+            You will be charged the exchange trading fee for both the opening and closing fills (~0.05% × 2).
+          </div>
+          <div class="btn-row" style="margin-top:10px">
+            <button class="btn btn-primary" id="btn-order-test" onclick="startOrderTest()">⚡ Run Test</button>
+            <button class="btn btn-outline" id="btn-clear-log" onclick="clearLog()">🗑 Clear</button>
+          </div>
+          <div style="margin-top:10px">
+            <div style="font-size:13px; color:var(--muted); margin-bottom:6px">LIVE LOG</div>
+            <div class="console" id="test-console"><span class="console-empty">Test output will appear here...</span></div>
+          </div>
         </div>
 
       </div>
@@ -521,7 +632,7 @@ input[type=range]::-webkit-slider-thumb {
           <label>Bot Token <span class="status-dot empty" id="s-TG_TOKEN"></span></label>
           <input type="password" id="TG_TOKEN" placeholder="123456789:ABCdef..."
                  oninput="onSecretInput('TG_TOKEN')">
-          <div style="font-size:11px; color:var(--muted); margin-top:4px">
+          <div style="font-size:13px; color:var(--muted); margin-top:4px">
             Create bot via <code>@BotFather</code> → /newbot
           </div>
         </div>
@@ -530,9 +641,16 @@ input[type=range]::-webkit-slider-thumb {
           <label>Your Chat ID <span class="status-dot empty" id="s-TG_CHAT_ID"></span></label>
           <input type="text" id="TG_CHAT_ID" placeholder="1234567890"
                  oninput="onSecretInput('TG_CHAT_ID')">
-          <div style="font-size:11px; color:var(--muted); margin-top:4px">
+          <div style="font-size:13px; color:var(--muted); margin-top:4px">
             Get it from <code>@userinfobot</code>
           </div>
+        </div>
+
+        <!-- ── Telegram test inline ── -->
+        <div class="test-row">
+          <button class="btn btn-primary" id="btn-test-tg" onclick="testTelegram()">📱 Test Bot</button>
+          <span id="ti-bot" class="test-chip">Bot —</span>
+          <span id="ti-chat" class="test-chip">Chat —</span>
         </div>
 
       </div>
@@ -606,43 +724,78 @@ input[type=range]::-webkit-slider-thumb {
           </div>
         </div>
 
+        <!-- ── Signal/License test — server only ── -->
+        <div id="signal-test-section" style="display:none">
+          <div class="test-row">
+            <button class="btn btn-primary" id="btn-test-signal" onclick="testSignal()">🔑 Check License</button>
+            <span id="li-license" class="test-chip">License —</span>
+            <span id="li-plan" class="test-chip">Plan —</span>
+            <span id="li-valid" class="test-chip">Until —</span>
+          </div>
+        </div>
+
       </div>
     </div>
 
     <!-- Chart & Advanced -->
     <div class="card collapsed" id="card-advanced">
       <div class="card-header" onclick="toggleCard(this)">
-        <span class="icon">⚙️</span> Chart &amp; Advanced
-        <span class="toggle-icon">▶</span>
+        <span class="icon">📊</span> Chart Notifications
+        <span class="chevron">▾</span>
       </div>
-      <div class="card-body">
+      <div class="card-body hidden">
 
-        <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:12px">Chart Notifications</div>
+        <!-- Description + preview -->
+        <div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap">
 
-        <!-- Chart Timeframe -->
-        <div class="field-group" style="margin-bottom:16px">
-          <label class="field-label">Chart Timeframe</label>
-          <div style="display:flex; gap:8px; flex-wrap:wrap">
-            <button type="button" class="btn-tf" data-val="5m"  onclick="setChartTF(this)">5m</button>
-            <button type="button" class="btn-tf active" data-val="15m" onclick="setChartTF(this)">15m</button>
-            <button type="button" class="btn-tf" data-val="1h"  onclick="setChartTF(this)">1h</button>
-            <button type="button" class="btn-tf" data-val="4h"  onclick="setChartTF(this)">4h</button>
+          <div style="flex:1; min-width:220px">
+            <div style="font-size:16px; color:var(--text); font-weight:600; margin-bottom:6px">
+              Market &amp; position visualization
+            </div>
+            <div style="font-size:15px; color:var(--muted); line-height:1.7; margin-bottom:18px">
+              On every trade event — open, close, or stop adjustment — the agent generates a candlestick chart
+              showing the current market context and the state of your open position:
+              entry price, stop-loss and take-profit levels.
+              The chart is sent as an image directly to your Telegram.
+            </div>
+
+            <!-- Chart Timeframe -->
+            <div style="margin-bottom:14px">
+              <label style="font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; font-weight:500; margin-bottom:8px; display:block">Chart Timeframe</label>
+              <div style="display:flex; gap:8px; flex-wrap:wrap">
+                <button type="button" class="btn-tf" data-val="5m"  onclick="setChartTF(this)">5m</button>
+                <button type="button" class="btn-tf active" data-val="15m" onclick="setChartTF(this)">15m</button>
+                <button type="button" class="btn-tf" data-val="1h"  onclick="setChartTF(this)">1h</button>
+                <button type="button" class="btn-tf" data-val="4h"  onclick="setChartTF(this)">4h</button>
+              </div>
+              <input type="hidden" id="CHART_TF" value="15m">
+              <div style="font-size:13px; color:var(--muted); margin-top:6px">Timeframe of candles displayed on the chart</div>
+            </div>
+
+            <!-- Chart Bars -->
+            <div>
+              <label style="font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; font-weight:500; margin-bottom:8px; display:block">Chart Candles</label>
+              <div style="display:flex; gap:8px; flex-wrap:wrap">
+                <button type="button" class="btn-tf" data-val="25"  onclick="setChartBars(this)">25</button>
+                <button type="button" class="btn-tf active" data-val="50"  onclick="setChartBars(this)">50</button>
+                <button type="button" class="btn-tf" data-val="75"  onclick="setChartBars(this)">75</button>
+                <button type="button" class="btn-tf" data-val="100" onclick="setChartBars(this)">100</button>
+              </div>
+              <input type="hidden" id="CHART_BARS" value="50">
+              <div style="font-size:13px; color:var(--muted); margin-top:6px">Number of candles shown (25–100)</div>
+            </div>
           </div>
-          <input type="hidden" id="CHART_TF" value="15m">
-          <div style="font-size:11px; color:var(--muted); margin-top:6px">Timeframe of candles in Telegram chart notifications</div>
-        </div>
 
-        <!-- Chart Bars -->
-        <div class="field-group">
-          <label class="field-label">Chart Candles</label>
-          <div style="display:flex; gap:8px; flex-wrap:wrap">
-            <button type="button" class="btn-tf" data-val="25"  onclick="setChartBars(this)">25</button>
-            <button type="button" class="btn-tf active" data-val="50"  onclick="setChartBars(this)">50</button>
-            <button type="button" class="btn-tf" data-val="75"  onclick="setChartBars(this)">75</button>
-            <button type="button" class="btn-tf" data-val="100" onclick="setChartBars(this)">100</button>
+          <div style="flex-shrink:0; text-align:center">
+            <img src="/static/chart_example.png"
+                 alt="Chart example"
+                 style="max-width:320px; width:100%; border-radius:8px; border:1px solid var(--border); display:block"
+                 onerror="this.parentElement.style.display='none'">
+            <div style="font-size:13px; color:var(--muted); margin-top:6px; font-style:italic">
+              Example — Telegram notification chart
+            </div>
           </div>
-          <input type="hidden" id="CHART_BARS" value="50">
-          <div style="font-size:11px; color:var(--muted); margin-top:6px">Number of candles displayed on chart (25–100)</div>
+
         </div>
 
       </div>
@@ -652,13 +805,13 @@ input[type=range]::-webkit-slider-thumb {
     <div class="card">
       <div class="card-body">
 
-        <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:10px">Readiness</div>
+        <div style="font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:10px">Readiness</div>
         <div id="readiness-checklist" style="margin-bottom:18px; display:flex; flex-direction:column; gap:6px">
           <div class="chk-item" id="chk-connection">
             <span class="chk-icon">○</span>
             <span>Exchange connection</span>
           </div>
-          <div class="chk-item" id="chk-ordertest">
+          <div class="chk-item" id="chk-ordertest" style="display:none">
             <span class="chk-icon">○</span>
             <span>Order placement test</span>
           </div>
@@ -672,141 +825,11 @@ input[type=range]::-webkit-slider-thumb {
           </div>
         </div>
 
-        <div class="btn-row">
+        <div class="btn-row" style="align-items:center">
           <button class="btn btn-primary" onclick="saveEnv()">💾 Save .env</button>
-          <button class="btn btn-outline" id="btn-start-agent" onclick="toggleAgent()">▶ Start Agent</button>
+          <button class="btn btn-outline" id="btn-agent-main" onclick="agentMainAction()">▶ Start Agent</button>
+          <button class="btn btn-danger"  id="btn-kill-agent" style="display:none" onclick="confirmKillAgent()" title="Close agent completely">🔴 Close Agent</button>
         </div>
-      </div>
-    </div>
-
-  </div>
-
-  <!-- ════ RIGHT COLUMN — STATUS & TESTS ════ -->
-  <div>
-
-    <!-- Connection Test -->
-    <div class="card">
-      <div class="card-header" onclick="toggleCard(this)">
-        <span class="icon">🔌</span> Connection Test
-        <span class="chevron">▾</span>
-      </div>
-      <div class="card-body">
-
-        <div id="conn-results">
-          <div class="result-row idle"><span class="label">Exchange</span><span class="value">—</span></div>
-          <div class="result-row idle"><span class="label">Balance</span><span class="value">—</span></div>
-          <div class="result-row idle"><span class="label">Position mode</span><span class="value">—</span></div>
-        </div>
-
-        <div class="btn-row">
-          <button class="btn btn-outline" id="btn-conn" onclick="testConnection()">🔌 Test Connection</button>
-        </div>
-
-      </div>
-    </div>
-
-    <!-- Exchange Order Test -->
-    <div class="card">
-      <div class="card-header" onclick="toggleCard(this)">
-        <span class="icon">⚡</span> Exchange Order Test
-        <span class="chevron">▾</span>
-      </div>
-      <div class="card-body">
-
-        <div style="font-size:12px; color:var(--muted); margin-bottom:12px; line-height:1.6">
-          Full cycle: open → modify SL → close.<br>
-          Uses <code>tests/test_agent.py</code> directly.
-        </div>
-
-        <div class="field-row" style="margin-bottom:12px">
-          <div class="field">
-            <label>Symbol</label>
-            <input type="text" id="test-symbol" value="ETH" style="text-transform:uppercase">
-          </div>
-          <div class="field">
-            <label>Side</label>
-            <select id="test-side">
-              <option value="LONG">LONG</option>
-              <option value="SHORT">SHORT</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="field">
-          <label>Mode</label>
-          <div class="radio-group" id="test-mode">
-            <label class="radio-btn active" onclick="setRadio('test-mode','paper',this)">
-              <input type="radio" name="test-mode" value="paper" checked>
-              📋 Paper
-            </label>
-            <label class="radio-btn" onclick="setRadio('test-mode','trade',this)">
-              <input type="radio" name="test-mode" value="trade">
-              ⚠️ Trade (real $)
-            </label>
-          </div>
-        </div>
-
-        <div id="trade-warn" style="display:none; margin-top:10px; padding:8px 10px;
-          background:rgba(242,167,39,.08); border:1px solid var(--yellow); border-radius:6px;
-          font-size:12px; color:var(--yellow)">
-          ⚠️ Real orders will be placed on the exchange. Small fees apply (~0.05% × 2).
-        </div>
-
-        <div class="btn-row">
-          <button class="btn btn-outline" id="btn-order-test" onclick="startOrderTest()">⚡ Run Test</button>
-          <button class="btn btn-outline" id="btn-clear-log" onclick="clearLog()">🗑 Clear</button>
-        </div>
-
-        <div style="margin-top:12px">
-          <div style="font-size:11px; color:var(--muted); margin-bottom:6px">LIVE LOG</div>
-          <div class="console" id="test-console">
-            <span class="console-empty">Test output will appear here...</span>
-          </div>
-        </div>
-
-      </div>
-    </div>
-
-    <!-- Telegram Bot Test -->
-    <div class="card">
-      <div class="card-header" onclick="toggleCard(this)">
-        <span class="icon">🤖</span> Telegram Bot Test
-        <span class="chevron">▾</span>
-      </div>
-      <div class="card-body">
-
-        <div id="tg-results">
-          <div class="result-row idle"><span class="label">Bot</span><span class="value">—</span></div>
-          <div class="result-row idle"><span class="label">Status</span><span class="value">—</span></div>
-          <div class="result-row idle"><span class="label">Chat ID</span><span class="value">—</span></div>
-        </div>
-
-        <div class="btn-row">
-          <button class="btn btn-outline" id="btn-test-tg" onclick="testTelegram()">📱 Test Bot</button>
-        </div>
-
-      </div>
-    </div>
-
-    <!-- Signal & License Test -->
-    <div class="card">
-      <div class="card-header" onclick="toggleCard(this)">
-        <span class="icon">🔑</span> Signal &amp; License
-        <span class="chevron">▾</span>
-      </div>
-      <div class="card-body">
-
-        <div id="lic-results">
-          <div class="result-row idle"><span class="label">Source</span><span class="value">—</span></div>
-          <div class="result-row idle"><span class="label">License</span><span class="value">—</span></div>
-          <div class="result-row idle"><span class="label">Plan</span><span class="value">—</span></div>
-          <div class="result-row idle"><span class="label">Valid until</span><span class="value">—</span></div>
-        </div>
-
-        <div class="btn-row">
-          <button class="btn btn-outline" id="btn-test-signal" onclick="testSignal()">🔑 Check License</button>
-        </div>
-
       </div>
     </div>
 
@@ -838,6 +861,18 @@ input[type=range]::-webkit-slider-thumb {
   </div>
 </div>
 
+<!-- Close agent confirmation modal -->
+<div id="kill-modal">
+  <div class="modal-box">
+    <h3>🔴 Close Agent?</h3>
+    <p id="kill-modal-msg" style="font-size:15px; color:var(--muted); line-height:1.6; margin-bottom:14px"></p>
+    <div class="modal-btn-row">
+      <button class="btn btn-danger"  onclick="doKillAgent()">🔴 Close Agent</button>
+      <button class="btn btn-outline" onclick="closeKillModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div id="toast"></div>
 
@@ -845,18 +880,25 @@ input[type=range]::-webkit-slider-thumb {
 // ── State ───────────────────────────────────────────────────────────────────
 const validationCache = {};
 let agentRunning   = false;
+let agentPaused    = false;
 let agentLogSSE    = null;
 let currentTestSSE = null;
 
 const testsPassed = { connection: false, orderTest: false, telegram: false, signal: false };
 
+const _testBtnMap = { connection:'btn-conn', orderTest:'btn-order-test', telegram:'btn-test-tg', signal:'btn-test-signal' };
+
 function markTest(key, ok) {
   testsPassed[key] = ok;
-  const map = { connection:'chk-connection', orderTest:'chk-ordertest', telegram:'chk-telegram', signal:'chk-signal' };
-  const el = document.getElementById(map[key]);
-  if (!el) return;
-  el.className = 'chk-item ' + (ok ? 'done' : 'fail');
-  el.querySelector('.chk-icon').textContent = ok ? '✓' : '✗';
+  const chkMap = { connection:'chk-connection', orderTest:'chk-ordertest', telegram:'chk-telegram', signal:'chk-signal' };
+  const el = document.getElementById(chkMap[key]);
+  if (el) {
+    el.className = 'chk-item ' + (ok ? 'done' : 'fail');
+    el.querySelector('.chk-icon').textContent = ok ? '✓' : '✗';
+  }
+  // Dim the test button on success, restore primary on failure
+  const btn = document.getElementById(_testBtnMap[key]);
+  if (btn) btn.className = 'btn ' + (ok ? 'btn-tested' : 'btn-primary');
 }
 
 // ── On load ─────────────────────────────────────────────────────────────────
@@ -960,12 +1002,37 @@ function setIfVal(id, val) {
 
 // ── Mode change ───────────────────────────────────────────────────────────────
 function onModeChange(mode) {
-  const row = document.getElementById('paper-balance-row');
-  if (row) row.style.display = mode === 'paper' ? 'block' : 'none';
+  const isPaper = mode === 'paper';
+
+  // Reset all test state when mode switches
+  resetTests();
+
+  // Mode notices under the buttons
+  const paperNotice = document.getElementById('paper-mode-inline');
+  const tradeNotice = document.getElementById('trade-mode-inline');
+  if (paperNotice) paperNotice.style.display = isPaper ? 'block' : 'none';
+  if (tradeNotice) tradeNotice.style.display = isPaper ? 'none' : 'block';
+
+  // API keys: hidden in paper, visible in trade
+  const keys = document.getElementById('api-keys-section');
+  if (keys) keys.style.display = isPaper ? 'none' : 'block';
+
+  // Order test card: only relevant in trade mode
+  const orderCard = document.getElementById('card-order-test');
+  if (orderCard) orderCard.style.display = isPaper ? 'none' : 'block';
+
+  // Readiness checklist: order test item only in trade mode
+  const chkOrder = document.getElementById('chk-ordertest');
+  if (chkOrder) chkOrder.style.display = isPaper ? 'none' : 'flex';
+
+  // Connection test button label
+  const connBtn = document.getElementById('btn-conn');
+  if (connBtn) connBtn.textContent = isPaper ? '🔌 Test Public API' : '🔌 Test Connection';
 }
 
 // ── Exchange change ──────────────────────────────────────────────────────────
 function onExchangeChange() {
+  resetTests();
   const ex = document.getElementById('EXCHANGE').value;
   document.querySelectorAll('.exchange-only').forEach(el => el.style.display = 'none');
   document.querySelectorAll('.okx-only').forEach(el => {
@@ -984,6 +1051,8 @@ function toggleSignalSource(src) {
   document.getElementById('telegram-fields').style.display = src === 'telegram' ? 'block' : 'none';
   const chkSignal = document.getElementById('chk-signal');
   if (chkSignal) chkSignal.style.display = src === 'server' ? 'flex' : 'none';
+  const sigTest = document.getElementById('signal-test-section');
+  if (sigTest) sigTest.style.display = src === 'server' ? 'block' : 'none';
 }
 
 function onParserModeChange() {
@@ -998,10 +1067,6 @@ function setRadio(groupId, value, clickedEl) {
   if (!group) return;
   group.querySelectorAll('.radio-btn').forEach(btn => btn.classList.remove('active'));
   if (clickedEl) clickedEl.classList.add('active');
-  // Show trade warning
-  if (groupId === 'test-mode') {
-    document.getElementById('trade-warn').style.display = value === 'trade' ? 'block' : 'none';
-  }
 }
 
 function setRadioValue(groupId, value) {
@@ -1148,47 +1213,69 @@ async function saveEnv() {
   }
 }
 
+// ── Reset test state ─────────────────────────────────────────────────────────
+function resetTests() {
+  // Clear all pass/fail flags
+  Object.keys(testsPassed).forEach(k => testsPassed[k] = false);
+  // Reset connection chips
+  setChip('ci-exchange', 'Exchange —');
+  setChip('ci-balance',  'Balance —');
+  setChip('ci-mode',     'Mode —');
+  // Reset readiness checklist items to idle
+  ['chk-connection','chk-ordertest','chk-telegram','chk-signal'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.className = 'chk-item';
+    const icon = el.querySelector('.chk-icon');
+    if (icon) icon.textContent = '○';
+  });
+  // Restore test buttons to primary
+  Object.values(_testBtnMap).forEach(btnId => {
+    const btn = document.getElementById(btnId);
+    if (btn) btn.className = 'btn btn-primary';
+  });
+}
+
+// ── Chip helper ──────────────────────────────────────────────────────────────
+function setChip(id, text, cls = 'idle') {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = text;
+  el.className = 'test-chip' + (cls !== 'idle' ? ' ' + cls : '');
+}
+
 // ── Test Connection ──────────────────────────────────────────────────────────
 async function testConnection() {
   const btn = document.getElementById('btn-conn');
   btn.classList.add('loading');
   btn.disabled = true;
-
-  setConnResults([
-    {label:'Exchange',      value:'Testing...', cls:'idle'},
-    {label:'Balance',       value:'...',        cls:'idle'},
-    {label:'Position mode', value:'...',        cls:'idle'},
-  ]);
+  setChip('ci-exchange', 'Testing…');
+  setChip('ci-balance',  '…');
+  setChip('ci-mode',     '…');
 
   try {
     const fields = collectFields();
     const r = await fetch('/api/test/connection', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
+      method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({fields}),
     });
     const d = await r.json();
-
     if (d.ok) {
       const b = d.balance;
-      setConnResults([
-        {label:'Exchange',      value:`✅ ${d.exchange} connected`, cls:'ok'},
-        {label:'Balance',       value:`${b.total} ${d.stbc} (free: ${b.free})`, cls:'ok'},
-        {label:'Position mode', value:d.pos_mode === 'paper' ? '📋 Paper' : d.pos_mode, cls:'ok'},
-      ]);
+      setChip('ci-exchange', `✅ ${d.exchange}`, 'ok');
+      setChip('ci-balance',  `${b.total} ${d.stbc}`, 'ok');
+      setChip('ci-mode',     d.pos_mode === 'paper' ? '📋 Paper' : d.pos_mode, 'ok');
       markTest('connection', true);
       showToast('✅ Connection successful', 'ok');
     } else {
-      setConnResults([
-        {label:'Exchange', value:'❌ ' + d.error, cls:'fail'},
-        {label:'Balance',  value:'—', cls:'idle'},
-        {label:'Position mode', value:'—', cls:'idle'},
-      ]);
+      setChip('ci-exchange', '❌ ' + d.error, 'fail');
+      setChip('ci-balance',  '—');
+      setChip('ci-mode',     '—');
       markTest('connection', false);
       showToast('❌ Connection failed', 'fail');
     }
   } catch(e) {
-    setConnResults([{label:'Error', value:e.message, cls:'fail'}]);
+    setChip('ci-exchange', '❌ ' + e.message, 'fail');
     markTest('connection', false);
   } finally {
     btn.classList.remove('loading');
@@ -1196,60 +1283,42 @@ async function testConnection() {
   }
 }
 
-function setConnResults(rows) {
-  const el = document.getElementById('conn-results');
-  el.innerHTML = rows.map(r =>
-    `<div class="result-row ${r.cls}"><span class="label">${r.label}</span><span class="value">${r.value}</span></div>`
-  ).join('');
-}
-
 // ── Test Telegram ────────────────────────────────────────────────────────────
 async function testTelegram() {
   const btn = document.getElementById('btn-test-tg');
   btn.classList.add('loading');
   btn.disabled = true;
-
-  setTgResults([
-    {label:'Bot',     value:'Testing...', cls:'idle'},
-    {label:'Status',  value:'...',        cls:'idle'},
-    {label:'Chat ID', value:'...',        cls:'idle'},
-  ]);
+  setChip('ti-bot',  'Testing…');
+  setChip('ti-chat', '…');
 
   try {
     const token   = el('TG_TOKEN');
     const chat_id = el('TG_CHAT_ID');
     if (!token || !chat_id) {
-      setTgResults([{label:'Error', value:'Fill in Bot Token and Chat ID first', cls:'fail'}]);
+      setChip('ti-bot', '⚠️ Fill token & chat ID', 'warn');
       showToast('⚠️ Fill in Bot Token and Chat ID first', 'fail');
       return;
     }
     const r = await fetch('/api/test/telegram', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
+      method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({tg_token: token, tg_chat_id: chat_id}),
     });
     const d = await r.json();
     if (d.ok) {
-      setTgResults([
-        {label:'Bot',     value:`✅ @${d.bot_name}`,   cls:'ok'},
-        {label:'Status',  value:'Connected — test message sent', cls:'ok'},
-        {label:'Chat ID', value:`${d.chat_id}`,        cls:'ok'},
-      ]);
+      setChip('ti-bot',  `✅ @${d.bot_name}`, 'ok');
+      setChip('ti-chat', `${d.chat_id}`,       'ok');
       updateDot('TG_TOKEN',   'ok', 'Valid — test message sent');
       updateDot('TG_CHAT_ID', 'ok', 'Valid chat ID');
       markTest('telegram', true);
       showToast(`✅ Bot @${d.bot_name} connected`, 'ok');
     } else {
-      setTgResults([
-        {label:'Bot',    value:'❌ Error',  cls:'fail'},
-        {label:'Status', value: d.error,   cls:'fail'},
-        {label:'Chat ID',value:'—',        cls:'idle'},
-      ]);
+      setChip('ti-bot',  '❌ ' + d.error, 'fail');
+      setChip('ti-chat', '—');
       markTest('telegram', false);
       showToast('❌ Telegram: ' + d.error, 'fail');
     }
   } catch(e) {
-    setTgResults([{label:'Error', value: e.message, cls:'fail'}]);
+    setChip('ti-bot', '❌ ' + e.message, 'fail');
     markTest('telegram', false);
     showToast('❌ ' + e.message, 'fail');
   } finally {
@@ -1258,82 +1327,46 @@ async function testTelegram() {
   }
 }
 
-function setTgResults(rows) {
-  const el = document.getElementById('tg-results');
-  el.innerHTML = rows.map(r =>
-    `<div class="result-row ${r.cls}"><span class="label">${r.label}</span><span class="value">${r.value}</span></div>`
-  ).join('');
-}
-
 // ── Test Signal & License ────────────────────────────────────────────────────
 async function testSignal() {
   const btn = document.getElementById('btn-test-signal');
   btn.classList.add('loading');
   btn.disabled = true;
-
-  setLicResults([
-    {label:'Source',     value:'Checking...', cls:'idle'},
-    {label:'License',    value:'...',         cls:'idle'},
-    {label:'Plan',       value:'...',         cls:'idle'},
-    {label:'Valid until',value:'...',         cls:'idle'},
-  ]);
+  setChip('li-license', 'Checking…');
+  setChip('li-plan',    '…');
+  setChip('li-valid',   '…');
 
   try {
     const source     = getRadioValue('SIGNAL_SOURCE') || 'telegram';
     const licenseKey = el('LICENSE_KEY');
     const server     = el('SIGNAL_SERVER');
-
     const r = await fetch('/api/test/signal', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
+      method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({signal_source: source, license_key: licenseKey, signal_server: server}),
     });
     const d = await r.json();
-
     if (d.ok) {
-      if (d.source === 'telegram') {
-        setLicResults([
-          {label:'Source',     value:'💬 Telegram (self-hosted)', cls:'ok'},
-          {label:'License',    value:'Not required',              cls:'ok'},
-          {label:'Plan',       value:'—',                         cls:'idle'},
-          {label:'Valid until',value:'—',                         cls:'idle'},
-        ]);
-      } else {
-        setLicResults([
-          {label:'Source',     value:`✅ Quantilan Server`,    cls:'ok'},
-          {label:'License',    value:'✅ Valid',               cls:'ok'},
-          {label:'Plan',       value: d.plan  || '—',          cls:'ok'},
-          {label:'Valid until',value: d.valid_until || '—',    cls:'ok'},
-        ]);
-        updateDot('LICENSE_KEY', 'ok', 'Valid license');
-      }
+      setChip('li-license', '✅ Valid',             'ok');
+      setChip('li-plan',    d.plan        || '—',   'ok');
+      setChip('li-valid',   d.valid_until || '—',   'ok');
+      updateDot('LICENSE_KEY', 'ok', 'Valid license');
       markTest('signal', true);
       showToast('✅ License check passed', 'ok');
     } else {
-      setLicResults([
-        {label:'Source',      value: source === 'server' ? '🌐 Quantilan Server' : '💬 Telegram', cls:'idle'},
-        {label:'License',     value:'❌ ' + d.error, cls:'fail'},
-        {label:'Plan',        value:'—', cls:'idle'},
-        {label:'Valid until', value:'—', cls:'idle'},
-      ]);
+      setChip('li-license', '❌ ' + d.error, 'fail');
+      setChip('li-plan',    '—');
+      setChip('li-valid',   '—');
       markTest('signal', false);
       showToast('❌ License: ' + d.error, 'fail');
     }
   } catch(e) {
-    setLicResults([{label:'Error', value: e.message, cls:'fail'}]);
+    setChip('li-license', '❌ ' + e.message, 'fail');
     markTest('signal', false);
     showToast('❌ ' + e.message, 'fail');
   } finally {
     btn.classList.remove('loading');
     btn.disabled = false;
   }
-}
-
-function setLicResults(rows) {
-  const el = document.getElementById('lic-results');
-  el.innerHTML = rows.map(r =>
-    `<div class="result-row ${r.cls}"><span class="label">${r.label}</span><span class="value">${r.value}</span></div>`
-  ).join('');
 }
 
 // ── Exchange Order Test ───────────────────────────────────────────────────────
@@ -1351,7 +1384,7 @@ async function startOrderTest() {
     const fields = collectFields();
     const symbol = document.getElementById('test-symbol').value.trim().toUpperCase() || 'ETH';
     const side   = document.getElementById('test-side').value;
-    const mode   = getRadioValue('test-mode') || 'paper';
+    const mode   = getRadioValue('MODE') || 'trade';   // always matches the selected trading mode
 
     // Start test
     const r = await fetch('/api/test/exchange', {
@@ -1425,37 +1458,89 @@ async function refreshAgentStatus() {
     const r = await fetch('/api/agent/status');
     const d = await r.json();
     agentRunning = d.running;
-    const badge = document.getElementById('agent-status-badge');
-    const btn   = document.getElementById('btn-start-agent');
-    if (agentRunning) {
-      badge.textContent = `● Agent running (pid ${d.pid})`;
-      badge.className = 'running';
-      btn.textContent = '⏹ Stop Agent';
-      btn.className   = 'btn btn-danger';
+    agentPaused  = d.paused || false;
+    const badge   = document.getElementById('agent-status-badge');
+    const btnMain = document.getElementById('btn-agent-main');
+    const btnKill = document.getElementById('btn-kill-agent');
+    if (!agentRunning) {
+      badge.textContent   = '● Agent stopped';
+      badge.className     = 'stopped';
+      btnMain.textContent = '▶ Start Agent';
+      btnMain.className   = 'btn btn-outline';
+      btnKill.style.display = 'none';
+    } else if (agentPaused) {
+      badge.textContent   = '● Trading paused';
+      badge.className     = 'paused';
+      btnMain.textContent = '▶ Resume Trade';
+      btnMain.className   = 'btn btn-primary';
+      btnKill.style.display = '';
     } else {
-      badge.textContent = '● Agent stopped';
-      badge.className = 'stopped';
-      btn.textContent = '▶ Start Agent';
-      btn.className   = 'btn btn-outline';
+      badge.textContent   = `● Agent running (pid ${d.pid})`;
+      badge.className     = 'running';
+      btnMain.textContent = '⏸ Stop Trade';
+      btnMain.className   = 'btn btn-yellow';
+      btnKill.style.display = '';
     }
   } catch {}
 }
 
-async function toggleAgent() {
-  if (agentRunning) {
-    await fetch('/api/agent/stop', {method:'POST'});
-    showToast('🛑 Agent stopped', 'ok');
-    if (agentLogSSE) { agentLogSSE.close(); agentLogSSE = null; }
-    await refreshAgentStatus();
-    return;
+async function agentMainAction() {
+  if (!agentRunning) {
+    await startAgent();
+  } else if (agentPaused) {
+    await resumeTrade();
+  } else {
+    await pauseTrade();
   }
+}
 
+async function pauseTrade() {
+  const r = await fetch('/api/agent/pause', {method:'POST'});
+  const d = await r.json();
+  if (d.ok) showToast('⏸ Trading paused', 'ok');
+  else       showToast('❌ ' + d.error, 'fail');
+  await refreshAgentStatus();
+}
+
+async function resumeTrade() {
+  const r = await fetch('/api/agent/resume', {method:'POST'});
+  const d = await r.json();
+  if (d.ok) showToast('▶ Trading resumed', 'ok');
+  else       showToast('❌ ' + d.error, 'fail');
+  await refreshAgentStatus();
+}
+
+function confirmKillAgent() {
+  const mode = getRadioValue('MODE') || 'paper';
+  document.getElementById('kill-modal-msg').textContent = mode === 'trade'
+    ? 'The agent process will be terminated. All open positions remain on the exchange under your manual management via the exchange UI.'
+    : 'The agent process will be terminated. The Telegram bot will stop. Virtual positions and history are saved to state.';
+  document.getElementById('kill-modal').classList.add('open');
+}
+
+async function doKillAgent() {
+  closeKillModal();
+  await fetch('/api/agent/stop', {method:'POST'});
+  showToast('Agent closed', 'ok');
+  // Write a final line to the agent log before closing the SSE stream
+  const cons = document.getElementById('agent-console');
+  if (cons) appendLog(cons, {type:'log', level:'WARNING', msg:'— Agent closed by user —'});
+  if (agentLogSSE) { agentLogSSE.close(); agentLogSSE = null; }
+  await refreshAgentStatus();
+}
+
+function closeKillModal() {
+  document.getElementById('kill-modal').classList.remove('open');
+}
+
+async function startAgent() {
   // Pre-flight check
-  const src = getRadioValue('SIGNAL_SOURCE') || 'telegram';
+  const src  = getRadioValue('SIGNAL_SOURCE') || 'telegram';
+  const mode = getRadioValue('MODE') || 'paper';
   const warnings = [];
   if (!testsPassed.connection)
     warnings.push({icon:'🔌', text:'Exchange connection not tested — check API keys and exchange settings.'});
-  if (!testsPassed.orderTest)
+  if (mode === 'trade' && !testsPassed.orderTest)
     warnings.push({icon:'⚡', text:'Order placement not tested — run a paper test to verify order execution works.'});
   if (!testsPassed.telegram)
     warnings.push({icon:'🤖', text:'Telegram bot not tested — the agent won\'t be able to send notifications or receive commands.'});
@@ -1471,6 +1556,16 @@ async function toggleAgent() {
 }
 
 async function doStartAgent() {
+  // Auto-save .env before starting so the agent always uses current GUI state.
+  // Silent — no toast, non-fatal if it fails.
+  try {
+    await fetch('/api/save', {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify({fields: collectFields()}),
+    });
+  } catch (_) {}
+
   const r = await fetch('/api/agent/start', {method:'POST'});
   const d = await r.json();
   if (d.ok) {

@@ -14,7 +14,7 @@ from enum import Enum
 
 logger = logging.getLogger(__name__)
 
-STATE_FILE = "agent_state.json"
+STATE_FILE = "agent_state.json"   # legacy default; prefer exchange-scoped names
 
 
 # ─────────────────────────────────────────
@@ -159,9 +159,11 @@ class AgentState:
 class StateManager:
     """Manages agent state with file persistence."""
 
-    def __init__(self, max_positions: int = 7):
-        self.state = AgentState(max_positions=max_positions)
+    def __init__(self, max_positions: int = 7, state_file: str = STATE_FILE):
+        self._file  = state_file
+        self.state  = AgentState(max_positions=max_positions)
         self._load()
+        logger.info(f"State file: {self._file}")
 
     # ── Positions ────────────────────────
 
@@ -284,16 +286,16 @@ class StateManager:
                 'current_mode':   self.state.current_mode,
                 'monitor_ts':     self.state.monitor_ts,
             }
-            with open(STATE_FILE, 'w') as f:
+            with open(self._file, 'w') as f:
                 json.dump(data, f, indent=2)
         except Exception as e:
             logger.error(f"State save error: {e}")
 
     def _load(self) -> None:
-        if not os.path.exists(STATE_FILE):
+        if not os.path.exists(self._file):
             return
         try:
-            with open(STATE_FILE) as f:
+            with open(self._file) as f:
                 data = json.load(f)
 
             for symbol, p in data.get('positions', {}).items():

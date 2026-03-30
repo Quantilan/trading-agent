@@ -150,6 +150,8 @@ class PersonalBot:
     # ─────────────────────────────────────
 
     def _is_owner(self, message: types.Message) -> bool:
+        if not message.from_user or message.from_user.is_bot:
+            return False
         return message.from_user.id == self.owner_chat_id
 
     async def _check_owner(self, message: types.Message) -> bool:
@@ -588,11 +590,23 @@ class PersonalBot:
                 await message.answer("📊 No open positions.")
                 return
 
-        # Get current price for validation
+        # Early check: FLAT / MODIFY_* require an existing open position
+        if signal.action in ("FLAT", "MODIFY_SL", "MODIFY_TP") and signal.symbol:
+            if not self.agent.state.get_position(signal.symbol):
+                await message.answer(
+                    f"⚠️ No open position for <b>{signal.symbol}</b>",
+                    parse_mode=ParseMode.HTML,
+                )
+                return
+
+        # Get current price for validation (skip for FLAT — price not needed)
         current_price: Optional[float] = None
-        if signal.symbol:
+        if signal.symbol and signal.action in ("LONG", "SHORT", "MODIFY_SL", "MODIFY_TP"):
             try:
-                current_price = await self.agent.executor.get_ticker(signal.symbol)
+                current_price = await asyncio.wait_for(
+                    self.agent.executor.get_ticker(signal.symbol),
+                    timeout=5.0,
+                )
             except Exception:
                 pass
 
@@ -837,10 +851,15 @@ class PersonalBot:
     async def notify(self, text: str) -> None:
         """Send notification to owner. Called by TradingAgent on events."""
         try:
-            await self.bot.send_message(
-                self.owner_chat_id, text,
-                parse_mode=ParseMode.HTML
+            await asyncio.wait_for(
+                self.bot.send_message(
+                    self.owner_chat_id, text,
+                    parse_mode=ParseMode.HTML
+                ),
+                timeout=10.0,
             )
+        except asyncio.TimeoutError:
+            logger.warning("[PersonalBot] notify timeout")
         except Exception as e:
             logger.error(f"[PersonalBot] notify error: {e}")
 

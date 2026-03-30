@@ -17,6 +17,14 @@ import re
 import sys
 from pathlib import Path
 
+# Windows consoles default to cp1251/cp1252 which can't encode emoji.
+# Reconfigure stdout/stderr to UTF-8 so log lines and print() work correctly.
+if sys.platform == "win32":
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 from agent.config import load_config, SUPPORTED_EXCHANGES
 from agent.logger import setup_logging
 from agent.main import TradingAgent
@@ -177,8 +185,32 @@ async def run():
     else:
         logger.info("ℹ️  Personal bot disabled (TG_TOKEN / TG_CHAT_ID not set)")
 
+    # ── Stdin command reader (GUI sends pause/resume via stdin pipe) ──────────
+    async def _stdin_reader() -> None:
+        """Read one-line commands from stdin; executed in a thread (Windows-safe).
+        Only active when stdin is a pipe (GUI mode). Skipped for TTY to avoid
+        blocking the thread pool on shutdown."""
+        if sys.stdin.isatty():
+            return  # running from terminal — no pipe commands expected
+        def _blocking_read():
+            try:
+                for raw in sys.stdin:
+                    cmd = raw.strip().lower()
+                    if cmd == "pause":
+                        agent.paused = True
+                        logger.info("⏸ [GUI] Trading paused")
+                    elif cmd == "resume":
+                        agent.paused = False
+                        logger.info("▶ [GUI] Trading resumed")
+            except Exception:
+                pass
+        await asyncio.get_event_loop().run_in_executor(None, _blocking_read)
+
     # ── Run everything ────────────────────────────────────
-    tasks = [asyncio.create_task(agent.start(), name="agent")]
+    tasks = [
+        asyncio.create_task(agent.start(),    name="agent"),
+        asyncio.create_task(_stdin_reader(),  name="stdin_reader"),
+    ]
 
     if personal_bot:
         tasks.append(asyncio.create_task(personal_bot.run(), name="personal_bot"))

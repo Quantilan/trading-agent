@@ -157,6 +157,14 @@ class Notifier:
         """Public method — send arbitrary text."""
         await self._send_text(text)
 
+    async def send_chart(self, image_bytes: bytes, base: str, tf: str) -> None:
+        """Send chart as a follow-up photo after the text notification."""
+        if not self.enabled:
+            return
+        exlbl   = _EXCHANGE_LABELS.get(self.exchange, self.exchange.upper())
+        caption = f"📊 {exlbl}, {base.upper()} — {tf}"
+        await self._send_photo(image_bytes, caption)
+
     # ─────────────────────────────────────────────────────────────────
     # INTERNAL HELPERS
     # ─────────────────────────────────────────────────────────────────

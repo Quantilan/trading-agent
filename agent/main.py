@@ -19,10 +19,13 @@ Security:
 """
 
 import asyncio
+import functools
 import logging
 import sys
 import time
 from typing import Optional
+
+from .chart import draw_chart
 
 from .config import load_config, AgentConfig
 from .state import (
@@ -57,7 +60,10 @@ class TradingAgent:
         self._closing_symbols: set = set()     # guard against double-close race condition
 
         # Modules
-        self.state    = StateManager(max_positions=config.max_positions)
+        self.state    = StateManager(
+            max_positions = config.max_positions,
+            state_file    = f"state_{config.exchange}.json",
+        )
 
         # Restore mode persisted by /mode command (overrides .env)
         if self.state.state.current_mode != config.mode:
@@ -194,6 +200,13 @@ class TradingAgent:
                 logger.error(f"❌ close_all error {pos.symbol}: {e}")
         return closed
 
+    async def _notify_chart(self, event: str, pos: Position) -> None:
+        """Wrapper that calls _notify_with_chart and logs any exception."""
+        try:
+            await self._notify_with_chart(event, pos)
+        except Exception as e:
+            logging.getLogger(__name__).error(f"[Notify] chart notification failed ({event}): {e!r}")
+
     async def _notify(self, text: str) -> None:
         """Route notification — personal_bot if available, else notifier."""
         if self.personal_bot:
@@ -203,38 +216,71 @@ class TradingAgent:
 
     async def _notify_with_chart(self, event: str, pos: Position) -> None:
         """
-        Generate candlestick chart then send notification with it.
-        Runs as a fire-and-forget task — never blocks order execution.
+        Flow:
+          1. Short text sent immediately so user sees confirmation right away.
+          2. Log: starting OHLCV fetch.
+          3. fetch_ohlcv (15 s timeout).
+          4. Log: candles received, drawing.
+          5. draw_chart() in thread pool — never blocks the event loop.
+          6. Full notification WITH chart photo sent (text fallback if build failed).
 
         event: 'open' | 'close' | 'modify_sl'
         For modify_sl: pos.stop_price must already contain the NEW stop.
         """
-        from .chart import draw_chart
         logger = logging.getLogger(__name__)
+        logger = logging.getLogger(__name__)
+
+        base = pos.symbol.upper()
+        for s in ('USDT', 'USDC', 'BUSD'):
+            if base.endswith(s):
+                base = base[:-len(s)]
+                break
+
+        # ── Step 1: short immediate confirmation ─────────────────────────────
+        if event == 'open':
+            side_emoji = "🟢" if pos.side == PositionSide.LONG else "🔴"
+            brief = f"{side_emoji} <b>{pos.side.value} {base}</b> @ {pos.entry_price} — 📊 fetching chart..."
+        elif event == 'close':
+            result_emoji = "✅" if pos.rpnl >= 0 else "❌"
+            brief = f"{result_emoji} <b>{base} closed</b> | rPnL: {pos.rpnl:+.2f}$ — 📊 fetching chart..."
+        else:  # modify_sl
+            brief = f"🟧 <b>{base}</b> SL → {pos.stop_price} — 📊 fetching chart..."
+        try:
+            await self._notify(brief)
+        except Exception as e:
+            logger.warning(f"[Notify] brief send failed ({event} {base}): {e}")
+
+        # ── Step 2–5: fetch + render ──────────────────────────────────────────
         chart: Optional[bytes] = None
         try:
-            stbc   = self.config.stbc or 'USDT'
-            base   = pos.symbol.upper()
-            for s in ('USDT', 'USDC', 'BUSD'):
-                if base.endswith(s):
-                    base = base[:-len(s)]
-                    break
+            logger.info(f"[Chart] {base} {event} — fetching {self.config.chart_bars}×{self.config.chart_tf} candles")
             ohlcv = await self.executor.fetch_ohlcv(
                 pos.symbol, self.config.chart_tf, self.config.chart_bars
             )
-            chart = draw_chart(
-                ohlcv, pos, event,
-                self.config.exchange, self.config.chart_tf, base
-            )
+            if ohlcv:
+                logger.info(f"[Chart] {base} {event} — {len(ohlcv)} candles received, drawing...")
+                chart = await asyncio.get_event_loop().run_in_executor(
+                    None,
+                    functools.partial(
+                        draw_chart, ohlcv, pos, event,
+                        self.config.exchange, self.config.chart_tf, base,
+                    ),
+                )
+            else:
+                logger.warning(f"[Chart] {base} {event} — no candles returned, sending text only")
         except Exception as e:
             logger.warning(f"[Chart] {pos.symbol} {event}: {e}")
 
-        if event == 'open':
-            await self.notifier.on_open(pos, chart)
-        elif event == 'close':
-            await self.notifier.on_close(pos, chart)
-        elif event == 'modify_sl':
-            await self.notifier.on_modify_sl(pos, chart)
+        # ── Step 6: full notification (photo+caption or text fallback) ────────
+        try:
+            if event == 'open':
+                await self.notifier.on_open(pos, chart)
+            elif event == 'close':
+                await self.notifier.on_close(pos, chart)
+            else:  # modify_sl
+                await self.notifier.on_modify_sl(pos, chart)
+        except Exception as e:
+            logger.warning(f"[Notify] full notify failed ({event} {base}): {e}")
 
     # ─────────────────────────────────────
     # SIGNAL PROCESSING
@@ -377,7 +423,7 @@ class TradingAgent:
         self.monitor.add_position(position)
 
         logger.info(f"✅ [{signal.symbol}] Position opened {signal.action} @ {entry_price}")
-        asyncio.create_task(self._notify_with_chart('open', position))
+        await self._notify_chart('open', position)
 
     # ─────────────────────────────────────
     # EXIT POSITION (by signal)
@@ -415,7 +461,7 @@ class TradingAgent:
             self.monitor.remove_position(signal.symbol)
             self.state.remove_position(signal.symbol)
             logger.info(f"⏹ [{signal.symbol}] Closed by signal | rPnL: {position.rpnl:+.2f}$")
-            asyncio.create_task(self._notify_with_chart('close', position))
+            await self._notify_chart('close', position)
         finally:
             self._closing_symbols.discard(signal.symbol)
 
@@ -445,7 +491,7 @@ class TradingAgent:
         if new_stop_id:
             position.stop_id = new_stop_id
         self.state.set_position(position)
-        asyncio.create_task(self._notify_with_chart('modify_sl', position))
+        await self._notify_chart('modify_sl', position)
 
     # ─────────────────────────────────────
     # MODIFY TAKE PROFIT (by signal)
@@ -550,7 +596,7 @@ class TradingAgent:
             f"{emoji} [{symbol}] {reason.upper()} hit @ {close_price:.4f} "
             f"| rPnL: {position.rpnl:+.2f}$"
         )
-        asyncio.create_task(self._notify_with_chart('close', position))
+        await self._notify_chart('close', position)
 
     # ─────────────────────────────────────
     # PNL UPDATER (background cache)
