@@ -35,8 +35,9 @@ class AgentConfig:
 
     # License
     license_key:        str   = ""
+    license_server:     str   = "https://license.quantilan.com"  # HTTP API for validate + daily_secret
 
-    # Signal server
+    # Signal server (WSS, separate from license_server)
     signal_server:      str   = ""
     signal_source:      str   = "server"  # server | telegram
 
@@ -86,6 +87,7 @@ def load_config() -> AgentConfig:
 
     cfg = AgentConfig(
         license_key         = os.getenv("LICENSE_KEY", ""),
+        license_server      = os.getenv("LICENSE_SERVER", "https://license.quantilan.com"),
         signal_server       = os.getenv("SIGNAL_SERVER", ""),
         signal_source       = os.getenv("SIGNAL_SOURCE", "server").lower().strip(),
         exchange            = os.getenv("EXCHANGE", "binance").lower().strip(),

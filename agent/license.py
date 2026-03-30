@@ -27,13 +27,13 @@ import aiohttp
 
 logger = logging.getLogger(__name__)
 
-LICENSE_SERVER = "https://license.quantilan.com/v1/validate"
+LICENSE_SERVER = "https://license.quantilan.com"
 
 
 class LicenseChecker:
 
     def __init__(self, license_key: str, check_interval: int = 21600,
-                 server_url: str = ""):
+                 license_server: str = ""):
         self.license_key    = license_key
         self.check_interval = check_interval
         self.is_valid       = False
@@ -41,14 +41,8 @@ class LicenseChecker:
         self._last_check:   int = 0
         self._fingerprint   = get_device_fingerprint()
 
-        if server_url:
-            base = (server_url
-                    .replace("wss://", "https://")
-                    .replace("ws://", "http://")
-                    .rstrip("/"))
-            self._server_url = f"{base}/v1/validate"
-        else:
-            self._server_url = LICENSE_SERVER
+        base = (license_server or LICENSE_SERVER).rstrip("/")
+        self._server_url = f"{base}/v1/validate"
 
     # ─────────────────────────────────────
     # VALIDATION

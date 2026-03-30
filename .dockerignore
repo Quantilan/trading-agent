@@ -1,0 +1,33 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Dev / IDE
+.git/
+.gitignore
+.claude/
+.vscode/
+.idea/
+*.md
+disclaimer.md
+privacy.md
+refund.md
+terms.md
+
+# Runtime data (mounted as volumes)
+.env
+logs/
+agent_state.json
+
+# Lock files (using requirements.txt in Docker)
+uv.lock
+
+# Tests
+tests/

@@ -211,6 +211,8 @@ class OrderExecutor:
             if ex_key == "hyperliquid":
                 ccxt_params["walletAddress"] = self.config.wallet_address
                 ccxt_params["privateKey"]    = self.config.api_secret
+                if self.config.api_key:
+                    ccxt_params["apiKey"] = self.config.api_key  # agent address (optional)
             elif ex_key == "okx":
                 ccxt_params["apiKey"]   = self.config.api_key
                 ccxt_params["secret"]   = self.config.api_secret
@@ -256,6 +258,8 @@ class OrderExecutor:
         if ex_key == "hyperliquid":
             ccxt_params["walletAddress"] = self.config.wallet_address
             ccxt_params["privateKey"]    = self.config.api_secret
+            if self.config.api_key:
+                ccxt_params["apiKey"] = self.config.api_key  # agent address (optional)
         elif ex_key == "okx":
             ccxt_params["apiKey"]   = self.config.api_key
             ccxt_params["secret"]   = self.config.api_secret

@@ -27,12 +27,8 @@ logger = logging.getLogger(__name__)
 
 class DailySecretManager:
 
-    def __init__(self, server_url: str, license_key: str, fingerprint: str):
-        # Normalize URL: wss:// -> https://
-        self._server      = (server_url
-                             .replace("wss://", "https://")
-                             .replace("ws://",  "http://")
-                             .rstrip("/"))
+    def __init__(self, license_server: str, license_key: str, fingerprint: str):
+        self._server      = (license_server or "https://license.quantilan.com").rstrip("/")
         self._license_key = license_key
         self._fingerprint = fingerprint
 

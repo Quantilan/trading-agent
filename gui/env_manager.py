@@ -42,7 +42,7 @@ ENV_DEFAULTS: Dict[str, str] = {
     "LLM_PROVIDER":           "none",
     "LLM_API_KEY":            "",
     "LLM_MODEL":              "",
-    "LOG_LEVEL":              "INFO",
+    "LOG_LEVEL":              "INFO",  # kept for agent runtime, not shown in UI
 }
 
 
@@ -212,11 +212,6 @@ def write_env(data: Dict[str, str]) -> None:
     else:
         lines.append("# LLM_MODEL=  # auto")
 
-    lines += [
-        "",
-        "# ─── Misc ─────────────────────────────────────────────────",
-        f"LOG_LEVEL={values['LOG_LEVEL']}",
-        "",
-    ]
+    lines.append("")
 
     ENV_FILE.write_text("\n".join(lines), encoding="utf-8")

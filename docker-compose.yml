@@ -1,0 +1,41 @@
+services:
+
+  # ── Setup GUI ────────────────────────────────────────────────────────────────
+  # Usage: docker compose up gui
+  # Open http://localhost:8080, configure, save .env, then stop.
+  gui:
+    build: .
+    image: quantilan-agent:latest
+    container_name: quantilan-gui
+    command: python setup_gui.py --host 0.0.0.0 --port 8080
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./.env:/app/.env
+      - ./logs:/app/logs:ro
+      - ./agent_state.json:/app/agent_state.json:ro
+    restart: "no"
+
+  # ── Trading Agent ─────────────────────────────────────────────────────────────
+  # Usage: docker compose up -d agent
+  agent:
+    build: .
+    image: quantilan-agent:latest
+    container_name: quantilan-agent
+    command: python main.py
+    volumes:
+      - ./.env:/app/.env:ro
+      - ./logs:/app/logs
+      - ./agent_state.json:/app/agent_state.json
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os; open('logs/agent.log')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -71,6 +71,11 @@ class TestTelegramRequest(BaseModel):
     tg_token:   str
     tg_chat_id: str
 
+class TestSignalRequest(BaseModel):
+    signal_source: str
+    license_key:   str = ""
+    signal_server: str = "wss://signals.quantilan.com"
+
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -131,6 +136,7 @@ def _build_config(fields: Dict[str, str]):
         signal_source    = fields.get("SIGNAL_SOURCE", "telegram"),
         signal_server    = fields.get("SIGNAL_SERVER", ""),
         license_key      = fields.get("LICENSE_KEY", ""),
+        license_server   = "https://license.quantilan.com",
         llm_provider     = fields.get("LLM_PROVIDER", "none"),
         llm_api_key      = fields.get("LLM_API_KEY", ""),
         llm_model        = fields.get("LLM_MODEL", ""),
@@ -316,6 +322,10 @@ async def test_telegram(req: TestTelegramRequest):
         token   = req.tg_token.strip()
         chat_id = req.tg_chat_id.strip()
 
+        # If token is masked (loaded from /api/config), fetch real value from .env
+        if _is_masked(token):
+            token = read_env().get("TG_TOKEN", "").strip()
+
         if not token or not chat_id:
             return {"ok": False, "error": "Token or chat_id is empty"}
 
@@ -340,6 +350,67 @@ async def test_telegram(req: TestTelegramRequest):
                     return {"ok": True, "bot_name": bot_name, "chat_id": chat_id}
                 else:
                     return {"ok": False, "error": resp.get("description", "Unknown error")}
+
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/api/test/signal")
+async def test_signal(req: TestSignalRequest):
+    """Verify license key against Quantilan signal server, or confirm Telegram mode."""
+    try:
+        source = req.signal_source.strip()
+
+        if source != "server":
+            return {"ok": True, "source": "telegram"}
+
+        import aiohttp
+        license_key = req.license_key.strip()
+        if _is_masked(license_key):
+            license_key = read_env().get("LICENSE_KEY", "").strip()
+
+        if not license_key:
+            return {"ok": False, "error": "License key is empty"}
+
+        # License API is always on license.quantilan.com — independent of SIGNAL_SERVER (WSS)
+        base_url = "https://license.quantilan.com"
+
+        connector = aiohttp.TCPConnector(resolver=aiohttp.ThreadedResolver())
+        async with aiohttp.ClientSession(connector=connector) as session:
+            async with session.post(
+                f"{base_url}/v1/validate",
+                json={"license_key": license_key},
+                timeout=aiohttp.ClientTimeout(total=10),
+            ) as r:
+                if r.status >= 500:
+                    return {"ok": False, "error": f"Signal server unavailable (HTTP {r.status}) — server may not be running yet"}
+                if r.status == 404:
+                    return {"ok": False, "error": "Endpoint not found — check Signal Server URL"}
+                ct = r.headers.get("Content-Type", "")
+                if "application/json" not in ct:
+                    return {"ok": False, "error": f"Server returned unexpected response (HTTP {r.status}) — check Signal Server URL"}
+
+                resp = await r.json()
+                if resp.get("valid"):
+                    import datetime
+                    expires_ts = resp.get("expires_at", 0)
+                    valid_until = datetime.datetime.fromtimestamp(expires_ts).strftime("%Y-%m-%d") if expires_ts else "—"
+                    return {
+                        "ok":          True,
+                        "source":      "server",
+                        "plan":        resp.get("plan", "—"),
+                        "valid_until": valid_until,
+                    }
+                else:
+                    reason = resp.get("reason", "invalid_license")
+                    messages = {
+                        "key_not_found":   "License key not found",
+                        "status_revoked":  "License has been revoked",
+                        "status_expired":  "License has expired",
+                        "expired":         "License has expired",
+                        "device_mismatch": "License is bound to a different device",
+                    }
+                    return {"ok": False, "error": messages.get(reason, reason)}
 
     except Exception as e:
         return {"ok": False, "error": str(e)}

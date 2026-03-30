@@ -69,12 +69,12 @@ class TradingAgent:
         self.license  = LicenseChecker(
             config.license_key,
             config.license_check_interval,
-            server_url = config.signal_server,
+            license_server = config.license_server,
         )
         self.daily_secret = DailySecretManager(
-            server_url   = config.signal_server,
-            license_key  = config.license_key,
-            fingerprint  = self._fingerprint,
+            license_server = config.license_server,
+            license_key    = config.license_key,
+            fingerprint    = self._fingerprint,
         )
         self.client = SignalClient(
             url             = config.signal_server,

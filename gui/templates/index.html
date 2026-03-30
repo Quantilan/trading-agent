@@ -304,10 +304,57 @@ input[type=range]::-webkit-slider-thumb {
 #toast.fail { border-color: var(--red); }
 
 /* ── Agent log panel ── */
-#agent-console { height: 200px; }
+#agent-console { height: 320px; }
 
 /* ── Section visibility ── */
 .exchange-only { display: none; }
+
+/* ── Readiness checklist ── */
+.chk-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  transition: color .2s;
+}
+.chk-item.done  { color: var(--green); }
+.chk-item.fail  { color: var(--red); }
+.chk-icon { font-size: 15px; line-height: 1; }
+
+/* ── Start warning modal ── */
+#start-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.65);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+}
+#start-modal.open { display: flex; }
+.modal-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px 28px;
+  max-width: 460px;
+  width: 90%;
+}
+.modal-box h3 { font-size: 16px; margin-bottom: 14px; }
+.modal-warn-item {
+  display: flex;
+  gap: 10px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  background: rgba(248,81,73,.07);
+  border: 1px solid rgba(248,81,73,.25);
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.modal-warn-item .wi-icon { flex-shrink: 0; }
+.modal-btn-row { display: flex; gap: 10px; margin-top: 18px; }
 </style>
 </head>
 <body>
@@ -363,10 +410,17 @@ input[type=range]::-webkit-slider-thumb {
         <div class="field exchange-only hl-only" id="f-wallet">
           <label>Wallet Address <span class="status-dot empty" id="s-EXCHANGE_WALLET_ADDRESS"></span></label>
           <input type="text" id="EXCHANGE_WALLET_ADDRESS" placeholder="0x..." oninput="onSecretInput('EXCHANGE_WALLET_ADDRESS')">
+          <div style="font-size:11px; color:var(--muted); margin-top:4px">Your main wallet (public address)</div>
         </div>
         <div class="field exchange-only hl-only" id="f-hl-secret">
           <label>Private Key <span class="status-dot empty" id="s-EXCHANGE_SECRET_HL"></span></label>
           <input type="password" id="EXCHANGE_SECRET_HL" placeholder="0x... private key">
+          <div style="font-size:11px; color:var(--muted); margin-top:4px">Agent private key (from HL dashboard → API Keys)</div>
+        </div>
+        <div class="field exchange-only hl-only" id="f-hl-apikey">
+          <label>Agent Address <span style="color:var(--muted);font-weight:400">(optional)</span> <span class="status-dot empty" id="s-EXCHANGE_API_KEY_HL"></span></label>
+          <input type="text" id="EXCHANGE_API_KEY_HL" placeholder="0x... agent public address" oninput="onSecretInput('EXCHANGE_API_KEY_HL')">
+          <div style="font-size:11px; color:var(--muted); margin-top:4px">Public address of the API agent key</div>
         </div>
 
         <div class="field">
@@ -448,7 +502,36 @@ input[type=range]::-webkit-slider-thumb {
       </div>
     </div>
 
-    <!-- Trading Mode -->
+    <!-- Telegram Bot -->
+    <div class="card">
+      <div class="card-header" onclick="toggleCard(this)">
+        <span class="icon">🤖</span> Telegram Bot
+        <span class="chevron">▾</span>
+      </div>
+      <div class="card-body">
+
+        <div class="field">
+          <label>Bot Token <span class="status-dot empty" id="s-TG_TOKEN"></span></label>
+          <input type="password" id="TG_TOKEN" placeholder="123456789:ABCdef..."
+                 oninput="onSecretInput('TG_TOKEN')">
+          <div style="font-size:11px; color:var(--muted); margin-top:4px">
+            Create bot via <code>@BotFather</code> → /newbot
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Your Chat ID <span class="status-dot empty" id="s-TG_CHAT_ID"></span></label>
+          <input type="text" id="TG_CHAT_ID" placeholder="1234567890"
+                 oninput="onSecretInput('TG_CHAT_ID')">
+          <div style="font-size:11px; color:var(--muted); margin-top:4px">
+            Get it from <code>@userinfobot</code>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Signal & Notifications -->
     <div class="card">
       <div class="card-header" onclick="toggleCard(this)">
         <span class="icon">🎛️</span> Signal &amp; Notifications
@@ -485,12 +568,30 @@ input[type=range]::-webkit-slider-thumb {
         <div id="telegram-fields" style="margin-top:14px">
           <div class="field">
             <label>Parser Mode</label>
-            <select id="PARSER_MODE">
+            <select id="PARSER_MODE" onchange="onParserModeChange()">
               <option value="regex">Regex (rule-based, fast)</option>
               <option value="llm">LLM (AI-powered, flexible)</option>
             </select>
           </div>
-          <div class="field">
+
+          <div id="llm-fields" style="display:none; margin-top:2px">
+            <div class="field">
+              <label>LLM Provider</label>
+              <select id="LLM_PROVIDER">
+                <option value="claude">Claude (Anthropic)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>API Key <span class="status-dot empty" id="s-LLM_API_KEY"></span></label>
+              <input type="password" id="LLM_API_KEY" placeholder="sk-ant-..." oninput="onSecretInput('LLM_API_KEY')">
+            </div>
+            <div class="field">
+              <label>Model <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+              <input type="text" id="LLM_MODEL" placeholder="auto: claude-haiku-4-5">
+            </div>
+          </div>
+
+          <div class="field" style="margin-top:10px">
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
               <input type="checkbox" id="CONFIRM_TRADE" checked style="width:auto">
               Require confirmation before executing parsed signals
@@ -501,84 +602,30 @@ input[type=range]::-webkit-slider-thumb {
       </div>
     </div>
 
-    <!-- Telegram Bot -->
-    <div class="card">
-      <div class="card-header" onclick="toggleCard(this)">
-        <span class="icon">🤖</span> Telegram Bot
-        <span class="chevron">▾</span>
-      </div>
-      <div class="card-body">
-
-        <div class="field">
-          <label>Bot Token <span class="status-dot empty" id="s-TG_TOKEN"></span></label>
-          <input type="password" id="TG_TOKEN" placeholder="123456789:ABCdef..."
-                 oninput="onSecretInput('TG_TOKEN')">
-          <div style="font-size:11px; color:var(--muted); margin-top:4px">
-            Create bot via <code>@BotFather</code> → /newbot
-          </div>
-        </div>
-
-        <div class="field">
-          <label>Your Chat ID <span class="status-dot empty" id="s-TG_CHAT_ID"></span></label>
-          <input type="text" id="TG_CHAT_ID" placeholder="1234567890"
-                 oninput="onSecretInput('TG_CHAT_ID')">
-          <div style="font-size:11px; color:var(--muted); margin-top:4px">
-            Get it from <code>@userinfobot</code>
-          </div>
-        </div>
-
-        <div class="btn-row">
-          <button class="btn btn-outline" id="btn-test-tg" onclick="testTelegram()">
-            📱 Test Bot
-          </button>
-        </div>
-
-      </div>
-    </div>
-
-    <!-- Advanced (collapsible) -->
-    <div class="card">
-      <div class="card-header collapsed" onclick="toggleCard(this)">
-        <span class="icon">⚙️</span> Advanced
-        <span class="chevron">▾</span>
-      </div>
-      <div class="card-body hidden">
-
-        <div class="field">
-          <label>LLM Provider</label>
-          <select id="LLM_PROVIDER" onchange="onLLMChange()">
-            <option value="none">None (regex only)</option>
-            <option value="claude">Claude (Anthropic)</option>
-          </select>
-        </div>
-
-        <div id="llm-fields" style="display:none">
-          <div class="field">
-            <label>Anthropic API Key <span class="status-dot empty" id="s-LLM_API_KEY"></span></label>
-            <input type="password" id="LLM_API_KEY" placeholder="sk-ant-..." oninput="onSecretInput('LLM_API_KEY')">
-          </div>
-          <div class="field">
-            <label>Model (optional)</label>
-            <input type="text" id="LLM_MODEL" placeholder="auto: claude-haiku-4-5">
-          </div>
-        </div>
-
-        <div class="field" style="margin-top:8px">
-          <label>Log Level</label>
-          <select id="LOG_LEVEL">
-            <option value="INFO">INFO</option>
-            <option value="DEBUG">DEBUG</option>
-            <option value="WARNING">WARNING</option>
-            <option value="ERROR">ERROR</option>
-          </select>
-        </div>
-
-      </div>
-    </div>
-
     <!-- Save & Launch -->
     <div class="card">
       <div class="card-body">
+
+        <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:10px">Readiness</div>
+        <div id="readiness-checklist" style="margin-bottom:18px; display:flex; flex-direction:column; gap:6px">
+          <div class="chk-item" id="chk-connection">
+            <span class="chk-icon">○</span>
+            <span>Exchange connection</span>
+          </div>
+          <div class="chk-item" id="chk-ordertest">
+            <span class="chk-icon">○</span>
+            <span>Order placement test</span>
+          </div>
+          <div class="chk-item" id="chk-telegram">
+            <span class="chk-icon">○</span>
+            <span>Telegram bot</span>
+          </div>
+          <div class="chk-item" id="chk-signal" style="display:none">
+            <span class="chk-icon">○</span>
+            <span>Signal server &amp; license</span>
+          </div>
+        </div>
+
         <div class="btn-row">
           <button class="btn btn-primary" onclick="saveEnv()">💾 Save .env</button>
           <button class="btn btn-outline" id="btn-start-agent" onclick="toggleAgent()">▶ Start Agent</button>
@@ -674,8 +721,51 @@ input[type=range]::-webkit-slider-thumb {
       </div>
     </div>
 
-    <!-- Agent Logs -->
+    <!-- Telegram Bot Test -->
     <div class="card">
+      <div class="card-header" onclick="toggleCard(this)">
+        <span class="icon">🤖</span> Telegram Bot Test
+        <span class="chevron">▾</span>
+      </div>
+      <div class="card-body">
+
+        <div id="tg-results">
+          <div class="result-row idle"><span class="label">Bot</span><span class="value">—</span></div>
+          <div class="result-row idle"><span class="label">Status</span><span class="value">—</span></div>
+          <div class="result-row idle"><span class="label">Chat ID</span><span class="value">—</span></div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-outline" id="btn-test-tg" onclick="testTelegram()">📱 Test Bot</button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Signal & License Test -->
+    <div class="card">
+      <div class="card-header" onclick="toggleCard(this)">
+        <span class="icon">🔑</span> Signal &amp; License
+        <span class="chevron">▾</span>
+      </div>
+      <div class="card-body">
+
+        <div id="lic-results">
+          <div class="result-row idle"><span class="label">Source</span><span class="value">—</span></div>
+          <div class="result-row idle"><span class="label">License</span><span class="value">—</span></div>
+          <div class="result-row idle"><span class="label">Plan</span><span class="value">—</span></div>
+          <div class="result-row idle"><span class="label">Valid until</span><span class="value">—</span></div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-outline" id="btn-test-signal" onclick="testSignal()">🔑 Check License</button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Agent Logs -->
+    <div class="card" id="card-agent-logs">
       <div class="card-header collapsed" onclick="toggleCard(this)">
         <span class="icon">📋</span> Agent Logs
         <span class="chevron">▾</span>
@@ -690,6 +780,18 @@ input[type=range]::-webkit-slider-thumb {
   </div>
 </div>
 
+<!-- Start warning modal -->
+<div id="start-modal">
+  <div class="modal-box">
+    <h3>⚠️ Not all checks passed</h3>
+    <div id="modal-warnings"></div>
+    <div class="modal-btn-row">
+      <button class="btn btn-primary" onclick="confirmStart()">▶ Start anyway</button>
+      <button class="btn btn-outline" onclick="closeStartModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div id="toast"></div>
 
@@ -700,11 +802,24 @@ let agentRunning   = false;
 let agentLogSSE    = null;
 let currentTestSSE = null;
 
+const testsPassed = { connection: false, orderTest: false, telegram: false, signal: false };
+
+function markTest(key, ok) {
+  testsPassed[key] = ok;
+  const map = { connection:'chk-connection', orderTest:'chk-ordertest', telegram:'chk-telegram', signal:'chk-signal' };
+  const el = document.getElementById(map[key]);
+  if (!el) return;
+  el.className = 'chk-item ' + (ok ? 'done' : 'fail');
+  el.querySelector('.chk-icon').textContent = ok ? '✓' : '✗';
+}
+
 // ── On load ─────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
   await loadConfig();
   await refreshAgentStatus();
   setInterval(refreshAgentStatus, 5000);
+  // Auto-subscribe to logs if agent is already running when page loads
+  if (agentRunning) { expandAgentLogs(); subscribeAgentLogs(); }
 });
 
 async function loadConfig() {
@@ -714,8 +829,14 @@ async function loadConfig() {
 
     const f = d.fields;
     setIfVal('EXCHANGE',               f.EXCHANGE);
-    setIfVal('EXCHANGE_API_KEY',       f.EXCHANGE_API_KEY);
-    setIfVal('EXCHANGE_SECRET',        f.EXCHANGE_SECRET);
+    // For HL, API key goes into the HL-specific field; for others — standard field
+    if (f.EXCHANGE === 'hyperliquid') {
+      setIfVal('EXCHANGE_API_KEY_HL',    f.EXCHANGE_API_KEY);
+      setIfVal('EXCHANGE_SECRET_HL',     f.EXCHANGE_SECRET);
+    } else {
+      setIfVal('EXCHANGE_API_KEY',       f.EXCHANGE_API_KEY);
+      setIfVal('EXCHANGE_SECRET',        f.EXCHANGE_SECRET);
+    }
     setIfVal('EXCHANGE_PASSPHRASE',    f.EXCHANGE_PASSPHRASE);
     setIfVal('EXCHANGE_WALLET_ADDRESS',f.EXCHANGE_WALLET_ADDRESS);
     setIfVal('EXCHANGE_STBC',          f.EXCHANGE_STBC);
@@ -723,11 +844,10 @@ async function loadConfig() {
     setIfVal('TG_CHAT_ID',             f.TG_CHAT_ID);
     setIfVal('LICENSE_KEY',            f.LICENSE_KEY);
     setIfVal('SIGNAL_SERVER',          f.SIGNAL_SERVER);
-    setIfVal('LLM_API_KEY',            f.LLM_API_KEY);
-    setIfVal('LLM_MODEL',              f.LLM_MODEL);
-    setIfVal('LOG_LEVEL',              f.LOG_LEVEL);
-    setIfVal('PARSER_MODE',            f.PARSER_MODE);
-    setIfVal('LLM_PROVIDER',           f.LLM_PROVIDER);
+    setIfVal('LLM_API_KEY',  f.LLM_API_KEY);
+    setIfVal('LLM_MODEL',    f.LLM_MODEL);
+    setIfVal('PARSER_MODE',  f.PARSER_MODE);
+    setIfVal('LLM_PROVIDER', f.LLM_PROVIDER);
 
     // Sliders
     if (f.MARGIN_PCT) {
@@ -775,7 +895,7 @@ async function loadConfig() {
     }
 
     onExchangeChange();
-    onLLMChange();
+    onParserModeChange();
 
   } catch(e) {
     console.error('loadConfig error', e);
@@ -812,11 +932,14 @@ function onExchangeChange() {
 function toggleSignalSource(src) {
   document.getElementById('server-fields').style.display   = src === 'server'   ? 'block' : 'none';
   document.getElementById('telegram-fields').style.display = src === 'telegram' ? 'block' : 'none';
+  const chkSignal = document.getElementById('chk-signal');
+  if (chkSignal) chkSignal.style.display = src === 'server' ? 'flex' : 'none';
 }
 
-function onLLMChange() {
-  const v = document.getElementById('LLM_PROVIDER').value;
-  document.getElementById('llm-fields').style.display = v === 'none' ? 'none' : 'block';
+function onParserModeChange() {
+  const v = document.getElementById('PARSER_MODE') ? document.getElementById('PARSER_MODE').value : 'regex';
+  const llm = document.getElementById('llm-fields');
+  if (llm) llm.style.display = v === 'llm' ? 'block' : 'none';
 }
 
 // ── Radio buttons ────────────────────────────────────────────────────────────
@@ -891,7 +1014,7 @@ function collectFields() {
   const ex  = document.getElementById('EXCHANGE').value;
   const fields = {
     EXCHANGE:               ex,
-    EXCHANGE_API_KEY:       el('EXCHANGE_API_KEY'),
+    EXCHANGE_API_KEY:       ex === 'hyperliquid' ? el('EXCHANGE_API_KEY_HL') : el('EXCHANGE_API_KEY'),
     EXCHANGE_SECRET:        ex === 'hyperliquid' ? el('EXCHANGE_SECRET_HL') : el('EXCHANGE_SECRET'),
     EXCHANGE_PASSPHRASE:    el('EXCHANGE_PASSPHRASE'),
     EXCHANGE_WALLET_ADDRESS:el('EXCHANGE_WALLET_ADDRESS'),
@@ -910,9 +1033,8 @@ function collectFields() {
     PARSER_MODE:            el('PARSER_MODE'),
     CONFIRM_TRADE:          document.getElementById('CONFIRM_TRADE').checked ? 'true' : 'false',
     LLM_PROVIDER:           el('LLM_PROVIDER'),
-    LLM_API_KEY:            el('LLM_API_KEY'),
-    LLM_MODEL:              el('LLM_MODEL'),
-    LOG_LEVEL:              el('LOG_LEVEL'),
+    LLM_API_KEY:  el('LLM_API_KEY'),
+    LLM_MODEL:    el('LLM_MODEL'),
   };
   return fields;
 }
@@ -972,6 +1094,7 @@ async function testConnection() {
         {label:'Balance',       value:`${b.total} ${d.stbc} (free: ${b.free})`, cls:'ok'},
         {label:'Position mode', value:d.pos_mode === 'paper' ? '📋 Paper' : d.pos_mode, cls:'ok'},
       ]);
+      markTest('connection', true);
       showToast('✅ Connection successful', 'ok');
     } else {
       setConnResults([
@@ -979,10 +1102,12 @@ async function testConnection() {
         {label:'Balance',  value:'—', cls:'idle'},
         {label:'Position mode', value:'—', cls:'idle'},
       ]);
+      markTest('connection', false);
       showToast('❌ Connection failed', 'fail');
     }
   } catch(e) {
     setConnResults([{label:'Error', value:e.message, cls:'fail'}]);
+    markTest('connection', false);
   } finally {
     btn.classList.remove('loading');
     btn.disabled = false;
@@ -1001,10 +1126,18 @@ async function testTelegram() {
   const btn = document.getElementById('btn-test-tg');
   btn.classList.add('loading');
   btn.disabled = true;
+
+  setTgResults([
+    {label:'Bot',     value:'Testing...', cls:'idle'},
+    {label:'Status',  value:'...',        cls:'idle'},
+    {label:'Chat ID', value:'...',        cls:'idle'},
+  ]);
+
   try {
     const token   = el('TG_TOKEN');
     const chat_id = el('TG_CHAT_ID');
     if (!token || !chat_id) {
+      setTgResults([{label:'Error', value:'Fill in Bot Token and Chat ID first', cls:'fail'}]);
       showToast('⚠️ Fill in Bot Token and Chat ID first', 'fail');
       return;
     }
@@ -1015,18 +1148,110 @@ async function testTelegram() {
     });
     const d = await r.json();
     if (d.ok) {
-      showToast(`✅ Bot @${d.bot_name} — message sent to ${d.chat_id}`, 'ok');
-      updateDot('TG_TOKEN', 'ok', 'Valid — test message sent');
+      setTgResults([
+        {label:'Bot',     value:`✅ @${d.bot_name}`,   cls:'ok'},
+        {label:'Status',  value:'Connected — test message sent', cls:'ok'},
+        {label:'Chat ID', value:`${d.chat_id}`,        cls:'ok'},
+      ]);
+      updateDot('TG_TOKEN',   'ok', 'Valid — test message sent');
       updateDot('TG_CHAT_ID', 'ok', 'Valid chat ID');
+      markTest('telegram', true);
+      showToast(`✅ Bot @${d.bot_name} connected`, 'ok');
     } else {
+      setTgResults([
+        {label:'Bot',    value:'❌ Error',  cls:'fail'},
+        {label:'Status', value: d.error,   cls:'fail'},
+        {label:'Chat ID',value:'—',        cls:'idle'},
+      ]);
+      markTest('telegram', false);
       showToast('❌ Telegram: ' + d.error, 'fail');
     }
   } catch(e) {
+    setTgResults([{label:'Error', value: e.message, cls:'fail'}]);
+    markTest('telegram', false);
     showToast('❌ ' + e.message, 'fail');
   } finally {
     btn.classList.remove('loading');
     btn.disabled = false;
   }
+}
+
+function setTgResults(rows) {
+  const el = document.getElementById('tg-results');
+  el.innerHTML = rows.map(r =>
+    `<div class="result-row ${r.cls}"><span class="label">${r.label}</span><span class="value">${r.value}</span></div>`
+  ).join('');
+}
+
+// ── Test Signal & License ────────────────────────────────────────────────────
+async function testSignal() {
+  const btn = document.getElementById('btn-test-signal');
+  btn.classList.add('loading');
+  btn.disabled = true;
+
+  setLicResults([
+    {label:'Source',     value:'Checking...', cls:'idle'},
+    {label:'License',    value:'...',         cls:'idle'},
+    {label:'Plan',       value:'...',         cls:'idle'},
+    {label:'Valid until',value:'...',         cls:'idle'},
+  ]);
+
+  try {
+    const source     = getRadioValue('SIGNAL_SOURCE') || 'telegram';
+    const licenseKey = el('LICENSE_KEY');
+    const server     = el('SIGNAL_SERVER');
+
+    const r = await fetch('/api/test/signal', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({signal_source: source, license_key: licenseKey, signal_server: server}),
+    });
+    const d = await r.json();
+
+    if (d.ok) {
+      if (d.source === 'telegram') {
+        setLicResults([
+          {label:'Source',     value:'💬 Telegram (self-hosted)', cls:'ok'},
+          {label:'License',    value:'Not required',              cls:'ok'},
+          {label:'Plan',       value:'—',                         cls:'idle'},
+          {label:'Valid until',value:'—',                         cls:'idle'},
+        ]);
+      } else {
+        setLicResults([
+          {label:'Source',     value:`✅ Quantilan Server`,    cls:'ok'},
+          {label:'License',    value:'✅ Valid',               cls:'ok'},
+          {label:'Plan',       value: d.plan  || '—',          cls:'ok'},
+          {label:'Valid until',value: d.valid_until || '—',    cls:'ok'},
+        ]);
+        updateDot('LICENSE_KEY', 'ok', 'Valid license');
+      }
+      markTest('signal', true);
+      showToast('✅ License check passed', 'ok');
+    } else {
+      setLicResults([
+        {label:'Source',      value: source === 'server' ? '🌐 Quantilan Server' : '💬 Telegram', cls:'idle'},
+        {label:'License',     value:'❌ ' + d.error, cls:'fail'},
+        {label:'Plan',        value:'—', cls:'idle'},
+        {label:'Valid until', value:'—', cls:'idle'},
+      ]);
+      markTest('signal', false);
+      showToast('❌ License: ' + d.error, 'fail');
+    }
+  } catch(e) {
+    setLicResults([{label:'Error', value: e.message, cls:'fail'}]);
+    markTest('signal', false);
+    showToast('❌ ' + e.message, 'fail');
+  } finally {
+    btn.classList.remove('loading');
+    btn.disabled = false;
+  }
+}
+
+function setLicResults(rows) {
+  const el = document.getElementById('lic-results');
+  el.innerHTML = rows.map(r =>
+    `<div class="result-row ${r.cls}"><span class="label">${r.label}</span><span class="value">${r.value}</span></div>`
+  ).join('');
 }
 
 // ── Exchange Order Test ───────────────────────────────────────────────────────
@@ -1067,6 +1292,7 @@ async function startOrderTest() {
       if (item.type === 'done') {
         currentTestSSE.close();
         currentTestSSE = null;
+        markTest('orderTest', item.ok === true);
         btn.classList.remove('loading');
         btn.disabled = false;
       }
@@ -1138,17 +1364,69 @@ async function toggleAgent() {
     await fetch('/api/agent/stop', {method:'POST'});
     showToast('🛑 Agent stopped', 'ok');
     if (agentLogSSE) { agentLogSSE.close(); agentLogSSE = null; }
+    await refreshAgentStatus();
+    return;
+  }
+
+  // Pre-flight check
+  const src = getRadioValue('SIGNAL_SOURCE') || 'telegram';
+  const warnings = [];
+  if (!testsPassed.connection)
+    warnings.push({icon:'🔌', text:'Exchange connection not tested — check API keys and exchange settings.'});
+  if (!testsPassed.orderTest)
+    warnings.push({icon:'⚡', text:'Order placement not tested — run a paper test to verify order execution works.'});
+  if (!testsPassed.telegram)
+    warnings.push({icon:'🤖', text:'Telegram bot not tested — the agent won\'t be able to send notifications or receive commands.'});
+  if (src === 'server' && !testsPassed.signal)
+    warnings.push({icon:'🔑', text:'Signal server license not verified — the agent may not receive signals.'});
+
+  if (warnings.length > 0) {
+    showStartModal(warnings);
+    return;
+  }
+
+  await doStartAgent();
+}
+
+async function doStartAgent() {
+  const r = await fetch('/api/agent/start', {method:'POST'});
+  const d = await r.json();
+  if (d.ok) {
+    showToast(`✅ Agent started (pid ${d.pid})`, 'ok');
+    expandAgentLogs();
+    subscribeAgentLogs();
   } else {
-    const r = await fetch('/api/agent/start', {method:'POST'});
-    const d = await r.json();
-    if (d.ok) {
-      showToast(`✅ Agent started (pid ${d.pid})`, 'ok');
-      subscribeAgentLogs();
-    } else {
-      showToast('❌ ' + d.error, 'fail');
-    }
+    showToast('❌ ' + d.error, 'fail');
   }
   await refreshAgentStatus();
+}
+
+function expandAgentLogs() {
+  const card = document.getElementById('card-agent-logs');
+  if (!card) return;
+  const header = card.querySelector('.card-header');
+  const body   = card.querySelector('.card-body');
+  if (header.classList.contains('collapsed')) {
+    header.classList.remove('collapsed');
+    body.classList.remove('hidden');
+  }
+}
+
+function showStartModal(warnings) {
+  const container = document.getElementById('modal-warnings');
+  container.innerHTML = warnings.map(w =>
+    `<div class="modal-warn-item"><span class="wi-icon">${w.icon}</span><span>${w.text}</span></div>`
+  ).join('');
+  document.getElementById('start-modal').classList.add('open');
+}
+
+async function confirmStart() {
+  closeStartModal();
+  await doStartAgent();
+}
+
+function closeStartModal() {
+  document.getElementById('start-modal').classList.remove('open');
 }
 
 function subscribeAgentLogs() {
