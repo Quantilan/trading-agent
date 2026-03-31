@@ -363,7 +363,7 @@ input[type=range]::-webkit-slider-thumb {
   align-items: center;
   justify-content: center;
 }
-#start-modal.open, #kill-modal.open, #save-modal.open { display: flex; }
+#start-modal.open, #kill-modal.open, /*#save-modal.open { display: flex; }*/
 #kill-modal {
   display: none;
   position: fixed;
@@ -894,7 +894,9 @@ input[type=range]::-webkit-slider-thumb {
   </div>
 </div>
 
+
 <!-- Save without tests warning modal -->
+ <!--
 <div id="save-modal">
   <div class="modal-box">
     <h3>⚠️ Parameters not tested</h3>
@@ -905,6 +907,8 @@ input[type=range]::-webkit-slider-thumb {
     </div>
   </div>
 </div>
+-->
+
 
 <!-- Close agent confirmation modal -->
 <div id="kill-modal">
@@ -932,10 +936,12 @@ let currentTestSSE = null;
 const testsPassed = { connection: false, orderTest: false, telegram: false, signal: false };
 let hasEnv = false;
 
+
 const _testBtnMap = { connection:'btn-conn', orderTest:'btn-order-test', telegram:'btn-test-tg', signal:'btn-test-signal' };
 
 function markTest(key, ok) {
   testsPassed[key] = ok;
+  
   const chkMap = { connection:'chk-connection', orderTest:'chk-ordertest', telegram:'chk-telegram', signal:'chk-signal' };
   const el = document.getElementById(chkMap[key]);
   if (el) {
@@ -1241,10 +1247,10 @@ function el(id) {
 // ── Save .env ────────────────────────────────────────────────────────────────
 async function saveEnv() {
   const anyTestPassed = Object.values(testsPassed).some(v => v);
-  if (!anyTestPassed) {
+  /*if (testsAttempted) {
     document.getElementById('save-modal').classList.add('open');
     return;
-  }
+  }*/
   await doSaveEnv();
 }
 
