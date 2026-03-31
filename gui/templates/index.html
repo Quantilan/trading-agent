@@ -363,7 +363,7 @@ input[type=range]::-webkit-slider-thumb {
   align-items: center;
   justify-content: center;
 }
-#start-modal.open, #kill-modal.open { display: flex; }
+#start-modal.open, #kill-modal.open, #save-modal.open { display: flex; }
 #kill-modal {
   display: none;
   position: fixed;
@@ -894,6 +894,18 @@ input[type=range]::-webkit-slider-thumb {
   </div>
 </div>
 
+<!-- Save without tests warning modal -->
+<div id="save-modal">
+  <div class="modal-box">
+    <h3>⚠️ Parameters not tested</h3>
+    <p style="font-size:15px; color:var(--muted); line-height:1.6; margin-bottom:14px">You haven't run the connection tests for these parameters. The agent may not work correctly with untested settings.</p>
+    <div class="modal-btn-row">
+      <button class="btn btn-primary" onclick="confirmSave()">💾 Save anyway</button>
+      <button class="btn btn-outline" onclick="closeSaveModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- Close agent confirmation modal -->
 <div id="kill-modal">
   <div class="modal-box">
@@ -918,6 +930,7 @@ let agentLogSSE    = null;
 let currentTestSSE = null;
 
 const testsPassed = { connection: false, orderTest: false, telegram: false, signal: false };
+let hasEnv = false;
 
 const _testBtnMap = { connection:'btn-conn', orderTest:'btn-order-test', telegram:'btn-test-tg', signal:'btn-test-signal' };
 
@@ -948,6 +961,7 @@ async function loadConfig() {
     const res = await fetch('/api/config');
     const d   = await res.json();
 
+    hasEnv = !!d.has_env;
     const f = d.fields;
     setIfVal('EXCHANGE',               f.EXCHANGE);
     // For HL, API key goes into the HL-specific field; for others — standard field
@@ -1226,6 +1240,24 @@ function el(id) {
 
 // ── Save .env ────────────────────────────────────────────────────────────────
 async function saveEnv() {
+  const anyTestPassed = Object.values(testsPassed).some(v => v);
+  if (!anyTestPassed) {
+    document.getElementById('save-modal').classList.add('open');
+    return;
+  }
+  await doSaveEnv();
+}
+
+async function confirmSave() {
+  closeSaveModal();
+  await doSaveEnv();
+}
+
+function closeSaveModal() {
+  document.getElementById('save-modal').classList.remove('open');
+}
+
+async function doSaveEnv() {
   const fields = collectFields();
   try {
     const r = await fetch('/api/save', {
@@ -1235,15 +1267,28 @@ async function saveEnv() {
     });
     const d = await r.json();
     if (d.ok) {
+      hasEnv = true;
       showToast('✅ .env saved successfully', 'ok');
-      // Re-validate
-      await loadConfig();
+      // Refresh validation dots only — do NOT call loadConfig() as it resets tests
+      await refreshValidationDots();
     } else {
       showToast('❌ Save failed: ' + d.error, 'fail');
     }
   } catch(e) {
     showToast('❌ ' + e.message, 'fail');
   }
+}
+
+async function refreshValidationDots() {
+  try {
+    const res = await fetch('/api/config');
+    const d   = await res.json();
+    if (d.validation) {
+      for (const [key, [status, hint]] of Object.entries(d.validation)) {
+        updateDot(key, status, hint);
+      }
+    }
+  } catch(e) { /* silent */ }
 }
 
 // ── Reset test state ─────────────────────────────────────────────────────────
@@ -1567,6 +1612,17 @@ function closeKillModal() {
 }
 
 async function startAgent() {
+  // If no .env exists yet, save current config first so the agent can read it
+  if (!hasEnv) {
+    try {
+      await fetch('/api/save', {
+        method:  'POST',
+        headers: {'Content-Type': 'application/json'},
+        body:    JSON.stringify({fields: collectFields()}),
+      });
+      hasEnv = true;
+    } catch (_) {}
+  }
   // Pre-flight check
   const src  = getRadioValue('SIGNAL_SOURCE') || 'telegram';
   const mode = getRadioValue('MODE') || 'paper';
