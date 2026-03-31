@@ -1,14 +1,31 @@
 # agent/signal_client.py
 """
-WebSocket client — connects to signal server,
+WebSocket client — connects to SignalsHub,
 receives signals and puts them into execution queue.
+
+Hub signal format (JSON):
+{
+    "type":       "signal",
+    "action":     "OPEN_LONG | OPEN_SHORT | CLOSE | MODIFY_SL",
+    "symbol":     "ETHUSDT",
+    "strategy":   "rsi",
+    "entry":      0.0,
+    "stop_price": 3100.0,
+    "take_price": 3400.0,
+    "take_levels": [[price, amount], ...],
+    "amount":     0.0,
+    "entry_type": "market",
+    "ts":         1741785600,
+    "kid":        "20250331:0",
+    "sig":        "<HMAC-SHA256>"
+}
 """
 
 import asyncio
 import json
 import logging
 import time
-from typing import Callable, Optional
+from typing import Optional
 
 import websockets
 from websockets.exceptions import ConnectionClosed, WebSocketException
@@ -17,44 +34,40 @@ from .state import Signal
 
 logger = logging.getLogger(__name__)
 
+# Hub action names → internal action names
+_ACTION_MAP = {
+    "OPEN_LONG":  "LONG",
+    "OPEN_SHORT": "SHORT",
+    "CLOSE":      "FLAT",
+    "MODIFY_SL":  "MODIFY_SL",
+    "MODIFY_TP":  "MODIFY_TP",
+}
+
 
 class SignalClient:
     """
-    Persistent WebSocket connection to signal server.
+    Persistent WebSocket connection to SignalsHub.
     Reconnects automatically on disconnect.
-
-    Incoming signal format (JSON):
-    {
-        "id":       "BTCUSDT_1741785600",
-        "symbol":   "BTC",
-        "action":   "LONG",           # LONG | SHORT | FLAT | MODIFY_SL
-        "entry":    94070.10,
-        "sl_pct":   0.015,
-        "tp_pct":   0.030,
-        "new_sl":   0.0,              # for MODIFY_SL action
-        "reason":   "PA_LONG_ENGULFING",
-        "strategy": "STRTG_02",
-        "timestamp": 1741785600,
-        "expires":   1741786500       # +900 sec (1 M15 candle)
-    }
     """
 
     def __init__(
         self,
-        url:              str,
-        license_key:      str,
-        signal_queue:     asyncio.Queue,
-        reconnect_delay:  int = 5,
+        url:             str,
+        license_key:     str,
+        signal_queue:    asyncio.Queue,
+        reconnect_delay: int = 5,
+        version:         str = "",
     ):
         self.url             = url
         self.license_key     = license_key
         self.signal_queue    = signal_queue
         self.reconnect_delay = reconnect_delay
+        self.version         = version
 
-        self._running        = False
-        self._connected      = False
-        self._ws             = None
-        self._last_ping      = 0
+        self._running   = False
+        self._connected = False
+        self._ws        = None
+        self._last_ping = 0
 
     # ─────────────────────────────────────
     # PUBLIC INTERFACE
@@ -103,19 +116,23 @@ class SignalClient:
             await ws.send(json.dumps({
                 "type":        "auth",
                 "license_key": self.license_key,
+                "version":     self.version,
             }))
 
             # Wait for auth confirmation
-            auth_response = await asyncio.wait_for(ws.recv(), timeout=10)
-            auth_data = json.loads(auth_response)
+            auth_raw  = await asyncio.wait_for(ws.recv(), timeout=10)
+            auth_data = json.loads(auth_raw)
 
-            if auth_data.get("status") != "ok":
+            # Hub sends {"type": "auth_ok", "plan": "...", "expires_at": ...}
+            # or        {"type": "auth_fail", "reason": "..."}
+            if auth_data.get("type") != "auth_ok":
                 reason = auth_data.get("reason", "unknown")
                 logger.error(f"[SignalClient] Auth rejected: {reason}")
                 raise ConnectionError(f"Auth failed: {reason}")
 
+            plan = auth_data.get("plan", "")
+            logger.info(f"✅ [SignalClient] Connected — plan={plan}")
             self._connected = True
-            logger.info(f"✅ [SignalClient] Connected and authorized")
 
             # Main receive loop
             async for raw in ws:
@@ -127,7 +144,7 @@ class SignalClient:
 
     async def _handle_message(self, raw: str) -> None:
         try:
-            data = json.loads(raw)
+            data     = json.loads(raw)
             msg_type = data.get("type", "signal")
 
             if msg_type == "ping":
@@ -137,19 +154,17 @@ class SignalClient:
             if msg_type == "signal":
                 signal = self._parse_signal(data)
                 if signal:
-                    # Skip expired signals
-                    if signal.expires and time.time() > signal.expires:
-                        logger.info(f"[SignalClient] Signal {signal.symbol} expired — skipping")
-                        return
-
                     await self.signal_queue.put(signal)
                     logger.info(
-                        f"📨 [SignalClient] Signal received: "
-                        f"{signal.symbol} {signal.action} | {signal.reason}"
+                        f"📨 [SignalClient] {signal.symbol} {signal.action} "
+                        f"strategy={signal.strategy} kid={data.get('kid', '?')}"
                     )
 
+            elif msg_type == "auth_fail":
+                logger.error(f"[SignalClient] Server: auth_fail reason={data.get('reason')}")
+
             elif msg_type == "info":
-                logger.info(f"[SignalClient] Server: {data.get('message', '')}")
+                logger.info(f"[SignalClient] Server info: {data.get('message', '')}")
 
             else:
                 logger.debug(f"[SignalClient] Unknown type: {msg_type}")
@@ -165,21 +180,30 @@ class SignalClient:
 
     def _parse_signal(self, data: dict) -> Optional[Signal]:
         try:
+            # Map hub action names → internal action names
+            raw_action = data.get("action", "FLAT").upper()
+            action     = _ACTION_MAP.get(raw_action, raw_action)
+
             signal = Signal(
-                id        = data.get("id", ""),
-                symbol    = data.get("symbol", ""),
-                action    = data.get("action", "FLAT").upper(),
-                entry     = float(data.get("entry", 0)),
-                sl_pct    = float(data.get("sl_pct", 0)),
-                tp_pct    = float(data.get("tp_pct", 0)),
-                new_sl    = float(data.get("new_sl", 0)),
-                reason    = data.get("reason", ""),
-                strategy  = data.get("strategy", ""),
-                timestamp = int(data.get("timestamp", 0)),
-                expires   = int(data.get("expires", 0)),
+                id          = data.get("id", ""),
+                symbol      = data.get("symbol", ""),
+                action      = action,
+                entry       = float(data.get("entry", 0)),
+                stop_price  = float(data.get("stop_price", 0)),    # absolute SL
+                take_price  = float(data.get("take_price", 0)),    # absolute TP
+                take_levels = data.get("take_levels", []),          # TP ladder
+                entry_type  = data.get("entry_type", "market"),
+                sl_pct      = float(data.get("sl_pct", 0)),
+                tp_pct      = float(data.get("tp_pct", 0)),
+                new_sl      = float(data.get("new_sl", data.get("stop_price", 0))),
+                reason      = data.get("reason", ""),
+                strategy    = data.get("strategy", ""),
+                timestamp   = int(data.get("ts", data.get("timestamp", 0))),
+                expires     = int(data.get("expires", 0)),
             )
-            signal._raw = data   # preserve raw dict for HMAC verification
+            signal._raw = data   # preserve full raw dict for HMAC verification
             return signal
+
         except Exception as e:
             logger.error(f"[SignalClient] Signal parse error: {e} | data: {data}")
             return None

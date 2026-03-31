@@ -311,6 +311,18 @@ class TradingAgent:
             if self.config.signal_source == "server":
                 raw = getattr(signal, '_raw', None)
                 if raw and raw.get("sig"):
+                    # Race condition recovery: if hub rotated key between our last
+                    # fetch and now, signal.kid won't match our cached kid.
+                    # Re-fetch the correct key from server before verifying.
+                    signal_kid = raw.get("kid", "")
+                    if signal_kid and signal_kid != self.daily_secret.kid:
+                        logger.info(
+                            f"[Security] kid mismatch "
+                            f"(signal={signal_kid} cached={self.daily_secret.kid}) "
+                            f"— fetching correct key"
+                        )
+                        await self.daily_secret.fetch_for_kid(signal_kid)
+
                     if not self.daily_secret.verify_signal(raw):
                         logger.warning(
                             f"🚫 Bad signature: {signal.symbol} {signal.action} — skipped"
