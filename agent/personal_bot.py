@@ -637,7 +637,8 @@ class PersonalBot:
 
         if action in ("LONG", "SHORT") and price and price > 0:
             if signal.stop_price > 0:
-                ok, err = validate_open_sl(action, price, signal.stop_price)
+                
+                ok, err = validate_open_sl(action, price, signal.stop_price, leverage=self.agent.config.leverage)
                 if not ok:
                     return err
             if signal.take_price > 0:

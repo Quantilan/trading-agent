@@ -54,8 +54,7 @@ class RegexParser:
 
     def parse(self, text: str, default_sl_pct: float = 2.0) -> Optional[Signal]:
         """
-        Parse a message into a Signal.
-        Returns None if the text doesn't look like a trading command.
+        Parse message into a Signal object.
         """
         t = text.lower().strip()
 
@@ -64,43 +63,35 @@ class RegexParser:
             return None
 
         symbol = self._detect_symbol(t)
-
-        # open/close require a known symbol; modify can work without (means current pos)
         if action in ("open", "close") and not symbol:
-            logger.debug(f"[RegexParser] action={action} but symbol not found: {text[:60]}")
             return None
 
         side = self._detect_side(t) if action == "open" else None
         if action == "open" and not side:
-            logger.debug(f"[RegexParser] open action but side not found: {text[:60]}")
             return None
 
+        # Extract numerical values from text
         sl_pct, sl_abs = self._extract_sl(t)
         tp_pct, tp_abs = self._extract_tp(t)
 
-        # Map to Signal fields
-        if action == "open":
-            sig_action   = side.upper()          # "LONG" | "SHORT"
-            # Use sl_pct if given; skip default if absolute SL price is present
-            effective_sl = sl_pct if sl_pct else (0.0 if sl_abs else default_sl_pct / 100)
-            new_sl       = 0.0
-            new_tp       = 0.0
-        elif action == "close":
-            sig_action   = "FLAT"
-            effective_sl = 0.0
-            new_sl       = 0.0
-            new_tp       = 0.0
-        elif action == "modify_sl":
-            sig_action   = "MODIFY_SL"
-            effective_sl = 0.0
-            new_sl       = sl_abs or 0.0
-            new_tp       = 0.0
-        else:  # modify_tp
-            sig_action   = "MODIFY_TP"
-            effective_sl = 0.0
-            new_sl       = 0.0
-            new_tp       = tp_abs or 0.0
+        sig_action = ""
+        effective_sl = 0.0
+        new_sl = 0.0
+        new_tp = 0.0
 
+        if action == "open":
+            sig_action = side.upper()
+            effective_sl = sl_pct if sl_pct else (0.0 if sl_abs else default_sl_pct / 100)
+        elif action == "close":
+            sig_action = "FLAT"
+        elif action == "modify_sl":
+            sig_action = "MODIFY_SL"
+            new_sl = sl_abs or 0.0 # Absolute price from text
+        elif action == "modify_tp":
+            sig_action = "MODIFY_TP"
+            new_tp = tp_abs[0] if isinstance(tp_abs, list) else (tp_abs or 0.0)
+
+        # Build final Signal
         signal = Signal(
             id         = str(uuid.uuid4())[:8],
             symbol     = symbol,
@@ -108,8 +99,10 @@ class RegexParser:
             entry      = 0.0,
             entry_type = "market",
             sl_pct     = effective_sl,
-            stop_price = sl_abs or 0.0,
-            take_price = tp_abs or 0.0,
+            # Ensure stop_price and take_price get the absolute values for any action
+            stop_price = sl_abs or new_sl or 0.0,
+            take_price = (tp_abs[0] if isinstance(tp_abs, list) else tp_abs) or new_tp or 0.0,
+            take_levels= tp_abs if isinstance(tp_abs, list) else [],
             tp_pct     = tp_pct or 0.0,
             new_sl     = new_sl,
             new_tp     = new_tp,
@@ -174,53 +167,56 @@ class RegexParser:
         return None
 
     def _extract_sl(self, text: str) -> Tuple[Optional[float], Optional[float]]:
-        """Returns (sl_pct, sl_abs). sl_pct is a decimal (0.02 = 2%)."""
+        """
+        Extracts SL as percentage or absolute price.
+        Supports: 'sl 2%', 'стоп eth на 1800', 'Стоп-лосс: 66500'
+        """
         
-        # "sl 2%" / "sl=2%" / "стоп 2%"
-        m = re.search(r'(?:sl[:\s=]*|стоп[:\s]*)(\d+\.?\d*)%', text)
-        if m:
-            return float(m.group(1)) / 100, None
-        # "sl 1800" / "sl=1800" (absolute price)
-        m = re.search(r'\bsl[:\s=]+(\d+\.?\d*)\b', text)
-        if m:
-            return None, float(m.group(1))
-        # "стоп на 1800"
-        m = re.search(r'стоп\s+на\s+(\d+\.?\d*)', text)
-        if m:
-            return None, float(m.group(1))
-        
-        # стоп стоплосс stop stoploss:
-        pattern = r'(?:стоп[- ]?лосс|стоп|stop[- ]?loss|stoploss|sl)[\s:-]+(\d+\.?\d*)'
-        m = re.search(pattern, text)
-        if m:
-            return None, float(m.group(1))
-        return None, None
-
-    def _extract_tp(self, text: str) -> Tuple[Optional[float], Optional[list[float]]]:
-        """Returns (tp_pct, tp_abs_list). tp_abs_list is a list of prices."""
-        text = text.lower()
-        
-        # 1. Поиск процентов (обычно один общий профит на позицию)
-        # "tp 5%" / "тейк: 5%"
-        m_pct = re.search(r'(?:tp|тейк|take[- ]?profit)[\s:-]*(\d+\.?\d*)%', text)
+        # 1. Percentage (e.g., 'sl 2%')
+        m_pct = re.search(r'(?:sl|стоп|stop[- ]?loss)[\s\w]*?(\d+\.?\d*)%', text)
         if m_pct:
             return float(m_pct.group(1)) / 100, None
 
-        # 2. Поиск списка цен (лестница тейков)
-        # Ищем ключевое слово, а затем последовательность цифр, разделенных запятыми
-        # Примеры: "тейк-профит: 2.973,3.080,3.173" или "tp: 3500, 3600"
-        pattern_abs = r'(?:tp|тейк(?:-профит)?|take[- ]?profit)[\s:-]+на?\s*([\d\.,\s]+)'
+        # 2. Absolute Price
+        # Using [\s\w:-]*? to skip any chars (spaces, tickers, colons, dashes) 
+        # then optional 'на' and finally the price.
+        pattern_abs = r'(?:sl|стоп(?:[- ]?лосс)?|stop[- ]?loss)[\s\w:-]*?(?:на\s+)?(\d+\.?\d+)'
         m_abs = re.search(pattern_abs, text)
         
         if m_abs:
-            raw_values = m_abs.group(1)
-            # Разделяем по запятой, убираем пробелы и фильтруем пустые строки
+            return None, float(m_abs.group(1))
+            
+        return None, None
+
+    def _extract_tp(self, text: str) -> Tuple[Optional[float], Optional[list[float]]]:
+        """
+        Extracts Take-Profit data. Handles ladders with separators like commas, 'и', 'and', '&' or dashes.
+        Example: 'тейки 160.2, 170.5 and 185' -> [160.2, 170.5, 185.0]
+        """
+        
+        # 1. Percentage check (e.g., 'tp 5%')
+        m_pct = re.search(r'(?:tp|тейк|take[- ]?profit)[\s\w:-]*?(\d+\.?\d*)%', text)
+        if m_pct:
+            return float(m_pct.group(1)) / 100, None
+
+        # 2. Absolute Ladder
+        # We allow numbers, dots, commas, spaces, and common word-separators in the capture group
+        pattern_abs = r'(?:tp|тейк(?:-профит)?|take[- ]?profit)[\s\w:-]*?(?:на\s+)?([\d\.,\sи&-]|and)+'
+        m_abs = re.search(pattern_abs, text)
+        
+        if m_abs:
+            raw_values = m_abs.group(0) # Get the full matched part starting from the keyword
+            # Find all numbers (including decimals) in the matched part after the keyword
+            # This is more robust than manual splitting
+            prices_str = re.findall(r'\d+\.?\d*', raw_values)
+            
             try:
-                # Заменяем возможные пробелы, чтобы корректно распарсить "3 000, 3 100"
-                prices = [float(x.strip().replace(' ', '')) for x in raw_values.split(',') if x.strip()]
+                # Filter out the first number if it's 0 (like in 'tp 0') 
+                # or ensure we only take prices after the keyword
+                prices = [float(p) for p in prices_str]
                 if prices:
                     return None, prices
             except ValueError:
-                pass # Если в строку попал мусор, который нельзя конвертировать в float
-
+                pass
+                
         return None, None

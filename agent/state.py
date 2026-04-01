@@ -47,6 +47,7 @@ class Position:
     volume:         float           # in USDT
     margin:         float           # margin in USDT
     leverage:       int
+    last_price:     float           # current market price
 
     stop_price:     float           # current stop price
     take_price:     float           # take profit (0 = none)

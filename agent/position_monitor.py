@@ -142,7 +142,10 @@ class PositionMonitor:
 
     async def _monitor_symbol(self, position: Position, resume_ts: int) -> None:
         symbol = position.symbol
-        logger.info(f"🔍 [{symbol}] Monitor started")
+        if getattr(position, 'last_price', 0) <= 0:
+            position.last_price = position.entry_price
+        
+        logger.info(f"🔍 [{symbol}] Monitor started. Initial last_price: {position.last_price}")
 
         try:
             # ── Restart gap-fill ──────────────────────────────────────
@@ -224,6 +227,7 @@ class PositionMonitor:
                     price = float(trade.get('price') or 0)
                     if price <= 0:
                         continue
+                    position.last_price = price
                     if high == 0.0:
                         high = low = price
                     else:
@@ -277,7 +281,7 @@ class PositionMonitor:
                         continue
                     if (ts + 60_000) > now_ms:
                         continue   # candle still open
-
+                    position.last_price = c
                     last_ts = ts
                     self.state.state.monitor_ts[symbol] = ts
                     self.state._save()

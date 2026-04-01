@@ -1,95 +1,124 @@
 # agent/signal_parser/validator.py
 """
 Pre-execution validation for parsed signals.
-
-Rules:
-  OPEN  LONG  — SL must be below entry, TP must be above entry
-  OPEN  SHORT — SL must be above entry, TP must be below entry
-  MODIFY_SL   — SL can only move toward the position (trail up for LONG, trail down for SHORT)
-  MODIFY_TP   — TP must remain on the profitable side of entry
+Updated: 
+1. Added Liquidation Price safety (10% buffer).
+2. Added Market Price check to prevent instant execution.
+3. Supports Spot-like behavior for Leverage=1.
 """
 
-from typing import Optional, Tuple, TYPE_CHECKING
+from typing import Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from agent.state import Position, PositionSide
+    from agent.state import Position
+
+# --- Settings ---
+MAX_SL_PCT = 0.50      # SL can't be more than 50% away from entry
+LIQ_BUFFER_PCT = 0.15  # 15% safety margin from the distance between Entry and Liq
 
 
-MAX_SL_PCT = 0.50  # SL can't be more than 50% away from entry
+def calculate_liq_price(side: str, entry: float, leverage: int) -> float:
+    """
+    Calculates basic liquidation price. 
+    If leverage is 1, liquidation for LONG is 0 (Spot behavior).
+    """
+    if leverage <= 0:
+        return 0.0
+    
+    # If leverage is 1, it's effectively a spot position.
+    price = entry * (1 + 1 / leverage)
+    if side == "LONG":
+        price = entry * (1 - 1 / leverage)
+    
+    return round(price, 8)
 
-def validate_open_sl(side: str, entry: float, sl: float) -> Tuple[bool, str]:
-    """Validate stop-loss price for a new position."""
+
+def validate_sl_logic(side: str, entry: float, sl: float, leverage: int, current_price: float) -> Tuple[bool, str]:
     if sl <= 0:
         return True, ""
+
+    # 1. Проверка на максимальное расстояние (MAX_SL_PCT)
+    # Если на LONG стоп ниже входа более чем на 50% — отсекаем
     if side == "LONG":
-        if sl >= entry:
-            return False, f"SL ${sl:.4f} must be <b>below</b> entry ${entry:.4f} for LONG"
         if (entry - sl) / entry > MAX_SL_PCT:
-            return False, f"SL ${sl:.4f} is more than 50% below entry ${entry:.4f}"
-    if side == "SHORT":
-        if sl <= entry:
-            return False, f"SL ${sl:.4f} must be <b>above</b> entry ${entry:.4f} for SHORT"
+            return False, f"SL ${sl:.4f} is more than {MAX_SL_PCT*100}% below entry ${entry:.4f}"
+    else: # SHORT
         if (sl - entry) / entry > MAX_SL_PCT:
-            return False, f"SL ${sl:.4f} is more than 50% above entry ${entry:.4f}"
+            return False, f"SL ${sl:.4f} is more than {MAX_SL_PCT*100}% above entry ${entry:.4f}"
+
+    # 2. Проверка стороны рынка (чтобы не закрыться мгновенно)
+    if side == "LONG":
+        if sl >= current_price:
+            return False, f"SL ${sl:.4f} must be below market ${current_price:.4f}"
+    else:
+        if sl <= current_price:
+            return False, f"SL ${sl:.4f} must be above market ${current_price:.4f}"
+
+    # 3. Проверка ликвидации с буфером 10%
+    liq = calculate_liq_price(side, entry, leverage)
+    if side == "LONG":
+        # Дистанция от входа до ликвы. Буфер — 10% от этой дистанции.
+        min_safe_sl = liq + (entry - liq) * LIQ_BUFFER_PCT
+        if sl <= min_safe_sl:
+            return False, f"SL ${sl:.4f} too close to LIQ ${liq:.2f}. Min safe: ${min_safe_sl:.2f}"
+    else:
+        max_safe_sl = liq - (liq - entry) * LIQ_BUFFER_PCT
+        if sl >= max_safe_sl:
+            return False, f"SL ${sl:.4f} too close to LIQ ${liq:.2f}. Max safe: ${max_safe_sl:.2f}"
+
     return True, ""
+
+def validate_open_sl(side: str, entry: float, sl: float, leverage: int) -> Tuple[bool, str]:
+    """
+    Validation for a NEW position (where current price = entry).
+    """
+    return validate_sl_logic(side, entry, sl, leverage, current_price=entry)
 
 
 def validate_open_tp(side: str, entry: float, tp: float) -> Tuple[bool, str]:
-    """Validate take-profit price for a new position."""
+    """Validate TP for new position."""
     if tp <= 0:
         return True, ""
     if side == "LONG" and tp <= entry:
-        return False, (
-            f"TP ${tp:.4f} must be <b>above</b> entry ${entry:.4f} for LONG"
-        )
+        return False, f"TP ${tp:.4f} must be above entry ${entry:.4f}"
     if side == "SHORT" and tp >= entry:
-        return False, (
-            f"TP ${tp:.4f} must be <b>below</b> entry ${entry:.4f} for SHORT"
-        )
+        return False, f"TP ${tp:.4f} must be below entry ${entry:.4f}"
     return True, ""
 
 
 def validate_modify_sl(position: "Position", new_sl: float) -> Tuple[bool, str]:
     """
-    Trailing stop validation — SL can only move in the direction of the position:
-      LONG  → SL must go UP   (lock in more profit / reduce loss)
-      SHORT → SL must go DOWN (lock in more profit / reduce loss)
+    Validation for changing SL on an EXISTING position.
+    Uses actual market price and position's leverage.
     """
-    if new_sl <= 0:
-        return False, "New SL price must be > 0"
-
-    from agent.state import PositionSide
-    cur = position.stop_price
-
-    if position.side == PositionSide.LONG:
-        if new_sl <= cur:
-            return False, (
-                f"For LONG, new SL ${new_sl:.4f} must be <b>above</b> "
-                f"current SL ${cur:.4f} (trail up only)"
-            )
-    elif position.side == PositionSide.SHORT:
-        if new_sl >= cur:
-            return False, (
-                f"For SHORT, new SL ${new_sl:.4f} must be <b>below</b> "
-                f"current SL ${cur:.4f} (trail down only)"
-            )
-    return True, ""
+    return validate_sl_logic(
+        side=position.side.value, 
+        entry=position.entry_price, 
+        sl=new_sl, 
+        leverage=position.leverage, 
+        current_price=position.last_price
+    )
 
 
 def validate_modify_tp(position: "Position", new_tp: float) -> Tuple[bool, str]:
-    """TP must stay on the profitable side of the entry price."""
+    """
+    TP must stay on the profitable side of entry AND market price.
+    """
     if new_tp <= 0:
         return False, "New TP price must be > 0"
 
-    from agent.state import PositionSide
     entry = position.entry_price
+    side = position.side.value
 
-    if position.side == PositionSide.LONG and new_tp <= entry:
-        return False, (
-            f"For LONG, new TP ${new_tp:.4f} must be <b>above</b> entry ${entry:.4f}"
-        )
-    if position.side == PositionSide.SHORT and new_tp >= entry:
-        return False, (
-            f"For SHORT, new TP ${new_tp:.4f} must be <b>below</b> entry ${entry:.4f}"
-        )
+    if side == "LONG":
+        if new_tp <= entry:
+            return False, f"For LONG, new TP ${new_tp:.4f} must be above entry ${entry:.4f}"
+        if new_tp <= position.last_price:
+            return False, f"For LONG, new TP ${new_tp:.4f} must be above market ${position.last_price:.4f}"
+    else: # SHORT
+        if new_tp >= entry:
+            return False, f"For SHORT, new TP ${new_tp:.4f} must be below entry ${entry:.4f}"
+        if new_tp >= position.last_price:
+            return False, f"For SHORT, new TP ${new_tp:.4f} must be below market ${position.last_price:.4f}"
+            
     return True, ""

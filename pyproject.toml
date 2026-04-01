@@ -24,7 +24,10 @@ build-backend = "hatchling.build"
 packages = ["agent", "gui"]
 
 [dependency-groups]
-dev = []
+dev = [
+    "pytest>=9.0.2",
+    "pytest-asyncio>=1.3.0",
+]
 
 [tool.uv.sources]
 # Pin ccxt.pro if available — comment out if using ccxt only
