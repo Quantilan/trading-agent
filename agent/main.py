@@ -661,6 +661,7 @@ class TradingAgent:
 # ─────────────────────────────────────────
 
 def main():
+
     config = load_config()
     setup_logging(config.log_level)
 

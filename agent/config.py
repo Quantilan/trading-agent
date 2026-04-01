@@ -89,6 +89,8 @@ class AgentConfig:
 def load_config() -> AgentConfig:
     """Load config from .env and validate required fields."""
 
+    load_dotenv(override=True)
+    
     cfg = AgentConfig(
         license_key         = os.getenv("LICENSE_KEY", ""),
         license_server      = os.getenv("LICENSE_SERVER", "https://license.quantilan.com"),
