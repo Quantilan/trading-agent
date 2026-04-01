@@ -20,7 +20,7 @@ import re
 import time
 import uuid
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 
 # Word boundary pattern for Cyrillic + Latin
 _WB = r'(?<![а-яёa-z0-9]){}(?![а-яёa-z0-9])'
@@ -188,35 +188,42 @@ class RegexParser:
             
         return None, None
 
-    def _extract_tp(self, text: str) -> Tuple[Optional[float], Optional[list[float]]]:
+    def _extract_tp(self, text: str) -> Tuple[str, Optional[List[float]]]:
         """
-        Extracts Take-Profit data. Handles ladders with separators like commas, 'и', 'and', '&' or dashes.
-        Example: 'тейки 160.2, 170.5 and 185' -> [160.2, 170.5, 185.0]
+        Extracts take-profit levels from text. 
+        Handles RU/UA/EN variants and 'dirty' lists with conjunctions.
         """
+        # 1. Broad pattern to capture the keyword and everything numeric/delimited that follows
+        # Matches: тейки, тейк-профіт, take profit, tp
+        pattern = r"(?i)(?:тейк[- ]?проф[иіi]т|тейк[а-яіi]*|take[- ]?profit|tp)[:\s-]*([\d\s,.\bи\band&]+)"
         
-        # 1. Percentage check (e.g., 'tp 5%')
-        m_pct = re.search(r'(?:tp|тейк|take[- ]?profit)[\s\w:-]*?(\d+\.?\d*)%', text)
-        if m_pct:
-            return float(m_pct.group(1)) / 100, None
+        match = re.search(pattern, text)
+        if not match:
+            return "TP", None
 
-        # 2. Absolute Ladder
-        # We allow numbers, dots, commas, spaces, and common word-separators in the capture group
-        pattern_abs = r'(?:tp|тейк(?:-профит)?|take[- ]?profit)[\s\w:-]*?(?:на\s+)?([\d\.,\sи&-]|and)+'
-        m_abs = re.search(pattern_abs, text)
+        # raw_data: e.g., "160.2, 170.5 и 185"
+        raw_data = match.group(1).strip()
         
-        if m_abs:
-            raw_values = m_abs.group(0) # Get the full matched part starting from the keyword
-            # Find all numbers (including decimals) in the matched part after the keyword
-            # This is more robust than manual splitting
-            prices_str = re.findall(r'\d+\.?\d*', raw_values)
-            
+        # 2. NORMALIZATION: Replace " и ", " and ", " & " with commas
+        # This is the key fix for the 'dirty' text test
+        raw_data = re.sub(r"\s+(?:и|&|and)\s+", ",", raw_data)
+        
+        # 3. Split by any sequence of commas or whitespace
+        # This handles "160.2,170.5 185" correctly
+        parts = re.split(r"[,\s]+", raw_data)
+        
+        levels = []
+        for part in parts:
+            # Standardize decimal separator
+            clean_part = part.replace(',', '.').strip()
+            if not clean_part:
+                continue
             try:
-                # Filter out the first number if it's 0 (like in 'tp 0') 
-                # or ensure we only take prices after the keyword
-                prices = [float(p) for p in prices_str]
-                if prices:
-                    return None, prices
+                # Handle cases like "185." at the end of a sentence
+                clean_part = clean_part.rstrip('.')
+                levels.append(float(clean_part))
             except ValueError:
-                pass
+                # Skip if the part is not a number (e.g. leftover text)
+                continue
                 
-        return None, None
+        return "TP", levels if levels else None

@@ -8,7 +8,7 @@ def parser():
 
 def test_tp_ladder_extraction(parser):
     """Verifies parsing of multiple take-profit levels (ladder)."""
-    text = "тейк-профит: 2.973,3.080,3.173"
+    text = "тейк-профіт: 2.973,3.080,3.173"
     _, tp_list = parser._extract_tp(text)
     assert tp_list == [2.973, 3.08, 3.173]
 
