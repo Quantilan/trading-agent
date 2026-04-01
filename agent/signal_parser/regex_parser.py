@@ -175,6 +175,7 @@ class RegexParser:
 
     def _extract_sl(self, text: str) -> Tuple[Optional[float], Optional[float]]:
         """Returns (sl_pct, sl_abs). sl_pct is a decimal (0.02 = 2%)."""
+        
         # "sl 2%" / "sl=2%" / "стоп 2%"
         m = re.search(r'(?:sl[:\s=]*|стоп[:\s]*)(\d+\.?\d*)%', text)
         if m:
@@ -187,20 +188,39 @@ class RegexParser:
         m = re.search(r'стоп\s+на\s+(\d+\.?\d*)', text)
         if m:
             return None, float(m.group(1))
+        
+        # стоп стоплосс stop stoploss:
+        pattern = r'(?:стоп[- ]?лосс|стоп|stop[- ]?loss|stoploss|sl)[\s:-]+(\d+\.?\d*)'
+        m = re.search(pattern, text)
+        if m:
+            return None, float(m.group(1))
         return None, None
 
-    def _extract_tp(self, text: str) -> Tuple[Optional[float], Optional[float]]:
-        """Returns (tp_pct, tp_abs). tp_pct is a decimal (0.05 = 5%)."""
-        # "tp 5%" / "тейк 5%"
-        m = re.search(r'(?:tp[:\s=]*|тейк[:\s]*)(\d+\.?\d*)%', text)
-        if m:
-            return float(m.group(1)) / 100, None
-        # "tp 3500" (absolute price)
-        m = re.search(r'\btp[:\s=]+(\d+\.?\d*)\b', text)
-        if m:
-            return None, float(m.group(1))
-        # "тейк на 3500"
-        m = re.search(r'тейк\s+на\s+(\d+\.?\d*)', text)
-        if m:
-            return None, float(m.group(1))
+    def _extract_tp(self, text: str) -> Tuple[Optional[float], Optional[list[float]]]:
+        """Returns (tp_pct, tp_abs_list). tp_abs_list is a list of prices."""
+        text = text.lower()
+        
+        # 1. Поиск процентов (обычно один общий профит на позицию)
+        # "tp 5%" / "тейк: 5%"
+        m_pct = re.search(r'(?:tp|тейк|take[- ]?profit)[\s:-]*(\d+\.?\d*)%', text)
+        if m_pct:
+            return float(m_pct.group(1)) / 100, None
+
+        # 2. Поиск списка цен (лестница тейков)
+        # Ищем ключевое слово, а затем последовательность цифр, разделенных запятыми
+        # Примеры: "тейк-профит: 2.973,3.080,3.173" или "tp: 3500, 3600"
+        pattern_abs = r'(?:tp|тейк(?:-профит)?|take[- ]?profit)[\s:-]+на?\s*([\d\.,\s]+)'
+        m_abs = re.search(pattern_abs, text)
+        
+        if m_abs:
+            raw_values = m_abs.group(1)
+            # Разделяем по запятой, убираем пробелы и фильтруем пустые строки
+            try:
+                # Заменяем возможные пробелы, чтобы корректно распарсить "3 000, 3 100"
+                prices = [float(x.strip().replace(' ', '')) for x in raw_values.split(',') if x.strip()]
+                if prices:
+                    return None, prices
+            except ValueError:
+                pass # Если в строку попал мусор, который нельзя конвертировать в float
+
         return None, None
