@@ -603,13 +603,16 @@ class PersonalBot:
         current_price: Optional[float] = None
         if signal.symbol and signal.action in ("LONG", "SHORT", "MODIFY_SL", "MODIFY_TP"):
             try:
+                logger.info(f"[PersonalBot] Fetching current price for {signal.symbol}")
                 current_price = await asyncio.wait_for(
                     self.agent.executor.get_ticker(signal.symbol),
                     timeout=5.0,
                 )
             except Exception:
                 pass
-
+            finally:
+                logger.info(f"[PersonalBot] Current price for {signal.symbol}: {current_price}")
+                
         # Validate
         error = self._validate_signal(signal, current_price)
         if error:
