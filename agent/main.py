@@ -200,6 +200,10 @@ class TradingAgent:
                 logger.error(f"❌ close_all error {pos.symbol}: {e}")
         return closed
 
+    def _has_pending_for(self, symbol: str) -> bool:
+        """Return True if signal_queue has any pending signal for this symbol."""
+        return any(s.symbol == symbol for s in self.signal_queue._queue)
+
     async def _notify_chart(self, event: str, pos: Position) -> None:
         """Wrapper that calls _notify_with_chart and logs any exception."""
         try:
@@ -251,6 +255,12 @@ class TradingAgent:
             logger.warning(f"[Notify] brief send failed ({event} {base}): {e}")
 
         # ── Step 2–5: fetch + render ──────────────────────────────────────────
+        # Skip chart if there's another signal pending for the same symbol —
+        # avoids double candle fetch on CLOSE+OPEN sequences.
+        if self._has_pending_for(pos.symbol):
+            logger.info(f"[Chart] {base} {event} — pending signal queued, skipping chart")
+            return
+
         chart: Optional[bytes] = None
         try:
             logger.info(f"[Chart] {base} {event} — fetching {self.config.chart_bars}×{self.config.chart_tf} candles")

@@ -105,8 +105,8 @@ class RiskManager:
             ratios      = [1.0] * len(signal.take_levels)   # equal split
             amounts     = self.split_amounts(amount, ratios, amount_step)
             take_levels = [
-                (round(p, price_precision), a)
-                for p, a in zip(signal.take_levels, amounts)
+                (round(level[0] if isinstance(level, (list, tuple)) else level, price_precision), a)
+                for level, a in zip(signal.take_levels, amounts)
             ]
             take_price = take_levels[0][0]                   # first level for record
             tp_pct     = abs(take_levels[-1][0] - price) / price
@@ -155,8 +155,7 @@ class RiskManager:
             return amount
         # Use integer arithmetic to avoid floating-point drift
         precision = max(0, round(-math.log10(step))) if step < 1 else 0
-        factor    = 10 ** precision
-        return math.floor(round(amount / step, 8)) * step
+        return round(math.floor(round(amount / step, 8)) * step, precision)
 
     def split_amounts(self, total: float, ratios: list, step: float) -> list:
         """
