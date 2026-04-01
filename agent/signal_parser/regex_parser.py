@@ -53,55 +53,76 @@ class RegexParser:
     # ─────────────────────────────────────────
 
     def parse(self, text: str, default_sl_pct: float = 2.0) -> Optional[Signal]:
+        # 1. Basic cleanup
         t = text.lower().strip()
 
+        # 2. Action detection
         action = self._detect_action(t)
         if not action: return None
 
+        # 3. Symbol detection
         symbol = self._detect_symbol(t)
         if action in ("open", "close") and not symbol: return None
 
-        # Extraction
+        # 4. Numerical data extraction (SL/TP)
         sl_pct, sl_abs = self._extract_sl(t)
         tp_pct, tp_abs = self._extract_tp(t)
 
+        # 5. TP Ladder proportions calculation
         proportions = []
-        if tp_abs:
+        if isinstance(tp_abs, list) and tp_abs:
             count = len(tp_abs)
             if count == 1:
-                proportions = [1.0]           
+                proportions = [1.0]
             elif count == 2:
-                proportions = [0.6, 0.4]      # 60% / 40%
+                proportions = [0.6, 0.4]
             elif count == 3:
-                proportions = [0.5, 0.3, 0.2] # 50% / 30% / 20%
+                proportions = [0.5, 0.3, 0.2]
             else:
                 proportions = [0.4, 0.2] + [0.4 / (count - 2)] * (count - 2)
 
-        # Action determination
-        side = self._detect_side(t) if action == "open" else None
-        sig_action = side.upper() if side else action.upper()
+        # 6. ACTION MAPPING (The fix for "Unknown action")
+        if action == "open":
+            side = self._detect_side(t)
+            sig_action = side.upper() if side else "LONG"
+        elif action == "close":
+            sig_action = "FLAT" # Fixes "CLOSE" vs "FLAT" mismatch
+        elif action == "modify_sl":
+            sig_action = "MODIFY_SL"
+        elif action == "modify_tp":
+            sig_action = "MODIFY_TP"
+        else:
+            sig_action = action.upper()
 
-        # Final prices
+        # 7. Final prices setup
         final_stop = sl_abs if sl_abs > 0 else 0.0
         final_take = tp_abs[0] if (isinstance(tp_abs, list) and tp_abs) else 0.0
         
-        # Build Signal
+        # 8. Build Signal object
         signal = Signal(
-            id          = str(uuid.uuid4())[:8],
-            symbol      = symbol,
-            action      = sig_action,
-            entry       = 0.0,
-            entry_type  = "market",
-            sl_pct      = sl_pct if sl_pct > 0 else (default_sl_pct / 100 if final_stop == 0 else 0.0),
-            stop_price  = final_stop,
-            take_price  = final_take,
-            take_levels  = tp_abs if isinstance(tp_abs, list) else [],
+            id               = str(uuid.uuid4())[:8],
+            symbol           = symbol,
+            action           = sig_action,
+            entry            = 0.0,
+            entry_type       = "market",
+            sl_pct           = sl_pct if sl_pct > 0 else (default_sl_pct / 100 if final_stop == 0 else 0.0),
+            stop_price       = final_stop,
+            take_price       = final_take,
+            take_levels      = tp_abs if isinstance(tp_abs, list) else [],
             take_proportions = proportions,
-            tp_pct      = tp_pct,
-            new_sl      = final_stop if sig_action == "MODIFY_SL" else 0.0,
-            new_tp      = final_take if sig_action == "MODIFY_TP" else 0.0,
-            reason      = "telegram_text",
-            timestamp   = int(time.time()),
+            tp_pct           = tp_pct,
+            new_sl           = final_stop if sig_action == "MODIFY_SL" else 0.0,
+            new_tp           = final_take if sig_action == "MODIFY_TP" else 0.0,
+            reason           = "telegram_text",
+            timestamp        = int(time.time()),
+        )
+
+        # 9. YOUR ORIGINAL LOGGER (The one you asked to keep)
+        logger.info(
+            f"Parsed signal: {signal.symbol} {signal.action} "
+            f"SL:{signal.stop_price or signal.sl_pct} "
+            f"TP:{signal.take_levels or signal.take_price} "
+            f"Props:{signal.take_proportions}"
         )
         
         return signal
