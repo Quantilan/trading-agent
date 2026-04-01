@@ -65,14 +65,26 @@ class RegexParser:
         sl_pct, sl_abs = self._extract_sl(t)
         tp_pct, tp_abs = self._extract_tp(t)
 
+        proportions = []
+        if tp_abs:
+            count = len(tp_abs)
+            if count == 1:
+                proportions = [1.0]           
+            elif count == 2:
+                proportions = [0.6, 0.4]      # 60% / 40%
+            elif count == 3:
+                proportions = [0.5, 0.3, 0.2] # 50% / 30% / 20%
+            else:
+                proportions = [0.4, 0.2] + [0.4 / (count - 2)] * (count - 2)
+
         # Action determination
         side = self._detect_side(t) if action == "open" else None
         sig_action = side.upper() if side else action.upper()
 
         # Final prices
         final_stop = sl_abs if sl_abs > 0 else 0.0
-        final_take = tp_abs[0] if tp_abs else 0.0
-
+        final_take = tp_abs[0] if (isinstance(tp_abs, list) and tp_abs) else 0.0
+        
         # Build Signal
         signal = Signal(
             id          = str(uuid.uuid4())[:8],
@@ -83,7 +95,8 @@ class RegexParser:
             sl_pct      = sl_pct if sl_pct > 0 else (default_sl_pct / 100 if final_stop == 0 else 0.0),
             stop_price  = final_stop,
             take_price  = final_take,
-            take_levels = tp_abs,
+            take_levels  = tp_abs if isinstance(tp_abs, list) else [],
+            take_proportions = proportions,
             tp_pct      = tp_pct,
             new_sl      = final_stop if sig_action == "MODIFY_SL" else 0.0,
             new_tp      = final_take if sig_action == "MODIFY_TP" else 0.0,
@@ -152,7 +165,7 @@ class RegexParser:
         # [\s\w\-:]*? -> optional whitespace
         # ([\d.]+) -> price
         # \s*(%)? -> optional percentage
-        
+
         pattern = r"(?i)(?:стоп[а-яіi\-]*|stop[- ]?loss)[\s\w\-:]*?([\d.]+)\s*(%)?"
         match = re.search(pattern, text)
         

@@ -699,13 +699,34 @@ class PersonalBot:
             elif signal.stop_price > 0:
                 parts.append(f"SL: ${signal.stop_price:.4f}")
 
+            # --- TP Section (with Ladder & Proportions support) ---
             if signal.tp_pct > 0:
+                # Handle percentage-based TP (e.g., "TP: 5%")
                 tp_str = f"TP: {signal.tp_pct * 100:.1f}%"
                 if price:
+                    # Calculate absolute price based on entry price and direction
                     tp_p = price * (1 + signal.tp_pct) if action == "LONG" else price * (1 - signal.tp_pct)
                     tp_str += f" (~${tp_p:.4f})"
                 parts.append(tp_str)
+            
+            elif signal.take_levels and len(signal.take_levels) > 0:
+                # Handle multi-level TP ladder (e.g., TP1, TP2, TP3)
+                tp_lines = ["TP Ladder:"]
+                
+                # Get proportions from signal or fallback to equal distribution
+                # props example: [0.5, 0.3, 0.2] for 50%, 30%, 20%
+                props = getattr(signal, 'take_proportions', [])
+                if not props:
+                    props = [1.0 / len(signal.take_levels)] * len(signal.take_levels)
+                
+                # Build a string for each level with its exit weight
+                for i, (lvl, prop) in enumerate(zip(signal.take_levels, props), 1):
+                    tp_lines.append(f"  TP{i}: ${lvl:.4f} ({prop*100:.0f}%)")
+                
+                parts.append("\n".join(tp_lines))
+
             elif signal.take_price > 0:
+                # Fallback for single absolute price TP
                 parts.append(f"TP: ${signal.take_price:.4f}")
 
             return "\n".join(parts)

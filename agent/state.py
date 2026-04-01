@@ -117,6 +117,7 @@ class Signal:
     stop_price:   float = 0.0       # absolute SL price (0 = use sl_pct)
     take_price:   float = 0.0       # absolute TP price (0 = use tp_pct)
     take_levels:  list  = field(default_factory=list)  # [price1, price2, ...] ladder TP
+    take_proportions: list = field(default_factory=list) # [0.5, 0.3, 0.2]
     timestamp:  int   = 0
     expires:    int   = 0     # signal expiry unix timestamp
 
