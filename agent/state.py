@@ -50,7 +50,11 @@ class Position:
     last_price:     float           # current market price
 
     stop_price:     float           # current stop price
-    take_price:     float           # take profit (0 = none)
+    take_price:     float = 0        # take profit (0 = none)
+
+    take_levels: list = field(default_factory=list)      # Prices: [2.973, 3.080, 3.173]
+    take_proportions: list = field(default_factory=list) # Weights: [0.5, 0.3, 0.2]
+
     sl_pct:         float           # SL % from entry
     tp_pct:         float           # TP % from entry
 

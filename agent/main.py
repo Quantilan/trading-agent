@@ -424,12 +424,17 @@ class TradingAgent:
             symbol       = signal.symbol,
             side         = PositionSide(signal.action),
             entry_price  = entry_price,
+            last_price   = entry_price,
             amount       = params.amount,
             volume       = params.volume,
             margin       = params.margin,
             leverage     = params.leverage,
             stop_price   = params.stop_price,
             take_price   = params.take_price,
+            
+            take_levels    = signal.take_levels,      # Pass ladder prices
+            take_proportions = signal.take_proportions, # Pass exit weights
+
             sl_pct       = params.sl_pct,
             tp_pct       = params.tp_pct,
             open_timestamp = int(__import__('time').time() * 1000),
