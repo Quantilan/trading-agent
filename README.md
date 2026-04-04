@@ -79,11 +79,15 @@ Quantilan Trading Agent is an autonomous cryptocurrency trading bot that runs on
 │  │  signal_client  ──►  risk_manager            │  │
 │  │  personal_bot   ──►  signal_parser           │  │
 │  │                           │                  │  │
-│  │                      order_executor          │  │
-│  │                           │                  │  │
+│  │                      order_executor ◄──┐     │  │
+│  │                           │           │     │  │
+│  │              position_monitor    price_watcher│ │
+│  │              (SL/TP/trailing)    (deferred   │  │
+│  │                           │      entries)   │  │
 │  │                      state_manager           │  │
+│  │              state_<exchange>_<mode>.json    │  │
 │  └───────────────────────────┼──────────────────┘  │
-│                              │ ccxt REST API       │
+│                     ccxt REST + WebSocket          │
 └──────────────────────────────┼─────────────────────┘
                                ▼
 ┌────────────────────────────────────────────────────┐
@@ -177,7 +181,7 @@ Open **http://localhost:8080** (or your VPS IP).
 | Section | What to fill in |
 |---------|----------------|
 | **Exchange & Credentials** | Exchange, API key/secret, trading mode (paper/live), virtual balance |
-| **Risk Management** | Margin per trade %, leverage, max positions, default SL % |
+| **Risk Management** | Margin %, leverage, max positions, default SL %, default TP %, trailing stop toggle |
 | **Telegram Bot** | Bot token from @BotFather, your Chat ID from @userinfobot |
 | **Signal & Notifications** | Signal source (Quantilan Server / Telegram), license key, parser mode |
 | **Chart & Advanced** *(collapsed)* | Chart timeframe (5m/15m/1h/4h) and number of candles (25/50/75/100) for Telegram chart notifications |
@@ -212,11 +216,16 @@ Clicking **Start Agent** with unchecked items shows a warning with specific reco
 ```bash
 cd ~/trading-agent
 git pull
-make build
+make build    # fast rebuild with cache (routine updates)
 make restart
 ```
 
-That's it — pulls latest code, rebuilds the image, restarts the agent.
+If `requirements.txt` changed (new dependencies), use a full rebuild instead:
+
+```bash
+make rebuild  # no-cache rebuild — use after dependency changes
+make restart
+```
 
 ---
 
@@ -254,7 +263,7 @@ All persistent data lives on the host as bind mounts — safe across image rebui
 |-----------|---------------|---------|
 | `.env` | `/app/.env` | Configuration |
 | `logs/` | `/app/logs/` | Log files |
-| `agent_state.json` | `/app/agent_state.json` | Open positions, P&L history |
+| `state_<exchange>_<mode>.json` | `/app/state_*.json` | Open positions, P&L history (one file per exchange+mode combination, e.g. `state_binance_trade.json`) |
 
 ---
 
@@ -274,7 +283,9 @@ EXCHANGE_SECRET=...
 MARGIN_PCT=4.0            # % of free balance per trade
 LEVERAGE=5
 MAX_POSITIONS=7
-DEFAULT_SL_PCT=2.0
+DEFAULT_SL_PCT=2.0        # fallback SL % when not specified in signal
+DEFAULT_TP_PCT=5.0        # fallback TP % when not specified in signal (0 = disabled)
+TRAILING_STOP=false       # auto-tighten SL as profit grows (off when using Quantilan Server signals)
 
 # ── Trading mode ───────────────────────────────────────────
 MODE=paper                # paper (simulated) | trade (live)
@@ -291,10 +302,7 @@ SIGNAL_SERVER=wss://signals.quantilan.com
 
 # ── Signal parsing (telegram mode) ────────────────────────
 PARSER_MODE=regex         # regex | llm
-CONFIRM_TRADE=true
-DEFAULT_SL_PCT=2.0        # fallback SL when not in signal
-DEFAULT_TP_PCT=5.0        # fallback TP when not in signal (0 = disabled)
-TRAILING_STOP=false       # tighten SL as profit grows (off by default — use with own signals)
+CONFIRM_TRADE=true        # ask confirmation before executing parsed signals
 
 # ── Entry zone (deferred entries) ──────────────────────────
 ENTRY_TOLERANCE=0.1       # ±% tolerance around entry zone

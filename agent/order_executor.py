@@ -132,6 +132,7 @@ class OrderExecutor:
         self._markets      = {}
         self.is_one_way    = False  # set after connect()
         self.coins: dict   = {}     # symbol → CoinInfo, populated in _init_coins()
+        self._price_cache: dict = {}  # symbol → last known price (fast fallback)
 
     # ─────────────────────────────────────
     # CONNECT
@@ -619,10 +620,16 @@ class OrderExecutor:
     async def get_ticker(self, symbol: str) -> float:
         try:
             ticker = await self.exchange.fetch_ticker(self._ms(symbol))
-            return float(ticker.get('last', 0))
+            price  = float(ticker.get('last', 0) or ticker.get('close', 0) or 0)
+            if price > 0:
+                self._price_cache[symbol] = price
+            return price
         except Exception as e:
             logger.error(f"❌ [Executor] get_ticker {symbol}: {e}")
-            return 0.0
+            cached = self._price_cache.get(symbol, 0.0)
+            if cached > 0:
+                logger.info(f"[Executor] get_ticker {symbol}: using cached price {cached}")
+            return cached
 
     async def fetch_ohlcv(self, symbol: str, tf: str = '15m', limit: int = 50) -> list:
         """

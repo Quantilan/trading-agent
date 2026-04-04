@@ -677,7 +677,12 @@ class PersonalBot:
                 )
                 logger.info(f"[PersonalBot] Current price for {signal.symbol}: {current_price}")
             except asyncio.TimeoutError:
-                logger.warning(f"[PersonalBot] Price fetch timeout for {signal.symbol} — proceeding without price")
+                # Fallback: use last known cached price if available
+                current_price = self.agent.executor._price_cache.get(signal.symbol)
+                if current_price:
+                    logger.warning(f"[PersonalBot] Price fetch timeout for {signal.symbol} — using cached {current_price}")
+                else:
+                    logger.warning(f"[PersonalBot] Price fetch timeout for {signal.symbol} — proceeding without price")
             except Exception as e:
                 logger.warning(f"[PersonalBot] Price fetch failed for {signal.symbol}: {e}")
                 
