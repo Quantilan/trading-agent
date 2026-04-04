@@ -46,5 +46,69 @@ def test_dirty_text_parsing(parser):
     # Verification of the TP ladder in the signal object
     assert signal.take_levels == [160.2, 170.5, 185.0]
     
+# ── Entry parsing tests ───────────────────────────────────────────────────────
+
+def test_entry_single_price(parser):
+    """Single entry price → entry_min == entry_max == price (point zone)."""
+    text = "BTC long\nentry price: 68000\nstop-loss: 66500"
+    signal = parser.parse(text)
+    assert signal is not None
+    assert signal.entry_min == 68000.0
+    assert signal.entry_max == 68000.0   # point zone: min == max
+    assert signal.entry_type == "deferred"
+
+def test_entry_range(parser):
+    """Entry range → entry_min/entry_max set correctly (lower/upper)."""
+    text = "заходжу в inj long\nточка входу: 2.927 - 2.702\nтейк-профіт: 2.973,3.080,3.173\nстоп-лосс: 2.608"
+    signal = parser.parse(text)
+    assert signal is not None
+    assert signal.symbol == "INJ"
+    assert signal.action == "LONG"
+    assert signal.entry_min == pytest.approx(2.702, abs=0.001)
+    assert signal.entry_max == pytest.approx(2.927, abs=0.001)
+    assert signal.entry_type == "deferred"
+    assert signal.take_levels == [2.973, 3.08, 3.173]
+    assert signal.stop_price == pytest.approx(2.608, abs=0.001)
+
+def test_entry_range_dash_variants(parser):
+    """Entry range with em-dash separator."""
+    text = "ETH SHORT\nentry: 2100 – 2050\nstop-loss: 2200"
+    signal = parser.parse(text)
+    assert signal is not None
+    assert signal.entry_min == pytest.approx(2050.0)
+    assert signal.entry_max == pytest.approx(2100.0)
+
+def test_entry_keyword_enter(parser):
+    """'enter:' keyword."""
+    text = "SOL LONG enter: 145.5 stop-loss: 135"
+    signal = parser.parse(text)
+    assert signal is not None
+    assert signal.entry_min == pytest.approx(145.5)
+    assert signal.entry_type == "deferred"
+
+def test_entry_keyword_vkhod(parser):
+    """Russian 'вход' keyword."""
+    text = "BTC лонг вход: 65000 стоп на 63000"
+    signal = parser.parse(text)
+    assert signal is not None
+    assert signal.entry_min == pytest.approx(65000.0)
+    assert signal.entry_type == "deferred"
+
+def test_no_entry_gives_market(parser):
+    """No entry price → entry_type market, entry_min == 0."""
+    text = "ETH long стоп на 1800"
+    signal = parser.parse(text)
+    assert signal is not None
+    assert signal.entry_min == 0.0
+    assert signal.entry_type == "market"
+
+def test_entry_mid_used_as_entry(parser):
+    """For a range, signal.entry should be the midpoint."""
+    text = "BTC LONG entry: 68000 - 70000 stop-loss: 65000"
+    signal = parser.parse(text)
+    assert signal is not None
+    assert signal.entry == pytest.approx(69000.0)
+
+
 if __name__ == "__main__":
     pytest.main([__file__])

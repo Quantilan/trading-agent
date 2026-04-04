@@ -57,6 +57,7 @@ class Position:
 
     take_levels: list = field(default_factory=list)      # Prices: [2.973, 3.080, 3.173]
     take_proportions: list = field(default_factory=list) # Weights: [0.5, 0.3, 0.2]
+    take_amounts: list = field(default_factory=list)     # Amounts per level: [0.05, 0.03, 0.02]
 
     open_timestamp: int   = 0
     close_timestamp:int   = 0
@@ -123,6 +124,10 @@ class Signal:
 
     take_levels:  list  = field(default_factory=list)  # [price1, price2, ...] ladder TP
     take_proportions: list = field(default_factory=list) # [0.5, 0.3, 0.2]
+
+    # Entry range (from channel signal). If set — deferred entry until price hits zone.
+    entry_min:    float = 0.0   # lower bound (or single price)
+    entry_max:    float = 0.0   # upper bound (0 = same as entry_min = point entry)
 
     timestamp:  int   = 0
     expires:    int   = 0     # signal expiry unix timestamp

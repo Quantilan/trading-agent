@@ -207,6 +207,53 @@ async def get_config():
     return {"fields": masked, "validation": validation, "has_env": (Path(_ROOT / ".env")).exists()}
 
 
+@app.post("/api/diff")
+async def check_diff(req: SaveRequest):
+    """
+    Compare submitted form fields against existing .env.
+    Returns list of changed fields so the UI can prompt before overwriting.
+    Sensitive fields: only reports 'masked=True' if value changed, no values exposed.
+    Numeric fields: normalized to float before compare (avoids "4" vs "4.0" false positives).
+    """
+    env_path = Path(_ROOT / ".env")
+    if not env_path.exists():
+        return {"changed": [], "has_env": False}
+
+    existing = read_env()
+    fields   = dict(req.fields)
+
+    _NUMERIC_KEYS = {
+        "MARGIN_PCT", "LEVERAGE", "MAX_POSITIONS",
+        "PAPER_BALANCE", "DEFAULT_SL_PCT", "CHART_BARS",
+    }
+
+    def _norm(key: str, val: str) -> str:
+        val = (val or "").strip()
+        if key in _NUMERIC_KEYS:
+            try:
+                return str(float(val))
+            except (ValueError, TypeError):
+                pass
+        return val.lower()
+
+    changed = []
+    for key in existing:
+        new_val = (fields.get(key) or "").strip()
+        old_val = (existing.get(key) or "").strip()
+
+        if key in _SENSITIVE:
+            # If the form still contains the masked placeholder, user didn't touch it
+            if _is_masked(new_val):
+                continue
+            if new_val != old_val:
+                changed.append({"key": key, "masked": True})
+        else:
+            if _norm(key, new_val) != _norm(key, old_val):
+                changed.append({"key": key, "old": old_val, "new": new_val, "masked": False})
+
+    return {"changed": changed, "has_env": True}
+
+
 @app.post("/api/save")
 async def save_config(req: SaveRequest):
     try:
@@ -263,6 +310,17 @@ async def test_connection(req: TestConnectionRequest):
         total, free, used = await executor.get_balance()
         pos_mode = await executor.get_position_mode()
 
+        # Build coins summary for GUI display
+        coins_data = {
+            sym: {
+                "available":    c.available,
+                "min_notional": c.min_notional,
+                "amount_step":  c.amount_step,
+                "max_amount":   c.max_amount,
+            }
+            for sym, c in executor.coins.items()
+        } if executor.coins else {}
+
         await executor.disconnect()
         return {
             "ok":       True,
@@ -270,6 +328,7 @@ async def test_connection(req: TestConnectionRequest):
             "balance":  {"total": round(total, 2), "free": round(free, 2), "used": round(used, 2)},
             "stbc":     stbc,
             "pos_mode": pos_mode,
+            "coins":    coins_data,
         }
     except Exception as e:
         return {"ok": False, "error": str(e)}
@@ -294,14 +353,9 @@ async def _run_exchange_test(test_id: str, queue: asyncio.Queue, req: TestExchan
     """Background task: runs full exchange test and feeds logs to SSE queue."""
     handler = _QueueLogHandler(queue)
 
-    # Attach handler to root + ccxt loggers
-    loggers_to_patch = [
-        logging.getLogger(),
-        logging.getLogger("agent"),
-        logging.getLogger("ccxt"),
-        logging.getLogger("tests.test_agent"),
-        logging.getLogger("__main__"),
-    ]
+    # Add handler only to the root logger — all child loggers propagate up to it,
+    # so adding to both root AND children causes every record to appear twice.
+    loggers_to_patch = [logging.getLogger()]
     for lg in loggers_to_patch:
         lg.addHandler(handler)
 
@@ -361,6 +415,33 @@ async def stream_test(test_id: str):
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@app.get("/api/test/poll/{test_id}")
+async def poll_test(test_id: str):
+    """
+    Polling endpoint — returns all available log lines since last poll.
+    More reliable than SSE over SSH tunnels and reverse proxies.
+    Returns {items: [...], done: bool}.
+    """
+    queue = _active_tests.get(test_id)
+    if not queue:
+        return {"items": [], "done": True, "expired": True}
+
+    items = []
+    done  = False
+    # Drain everything currently available (non-blocking)
+    while True:
+        try:
+            item = queue.get_nowait()
+            items.append(item)
+            if item.get("type") == "done":
+                done = True
+                break
+        except asyncio.QueueEmpty:
+            break
+
+    return {"items": items, "done": done}
 
 
 @app.post("/api/test/telegram")

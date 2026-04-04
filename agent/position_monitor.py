@@ -174,8 +174,9 @@ class PositionMonitor:
                     if price > 0:
                         reason = self._check_hit(position, price, price)
                         if reason:
-                            await self._handle_hit(position, reason, price)
-                            return
+                            fully_closed = await self._handle_hit(position, reason, price)
+                            if fully_closed:
+                                return
 
             # ── Phase 1: watch_trades → synthetic first candle ───────
             next_boundary = _next_minute_ms(position.open_timestamp)
@@ -236,8 +237,9 @@ class PositionMonitor:
 
                     reason = self._check_hit(position, high, low)
                     if reason:
-                        await self._handle_hit(position, reason, price)
-                        return True
+                        fully_closed = await self._handle_hit(position, reason, price)
+                        if fully_closed:
+                            return True
 
         except asyncio.CancelledError:
             raise
@@ -291,8 +293,9 @@ class PositionMonitor:
 
                     if reason:
                         close_price = _hit_price(position, reason)
-                        await self._handle_hit(position, reason, close_price)
-                        return
+                        fully_closed = await self._handle_hit(position, reason, close_price)
+                        if fully_closed:
+                            return
 
         except asyncio.CancelledError:
             raise
@@ -327,8 +330,9 @@ class PositionMonitor:
                     reason = self._check_hit(position, h, l)
                     if reason:
                         close_price = _hit_price(position, reason)
-                        await self._handle_hit(position, reason, close_price)
-                        return
+                        fully_closed = await self._handle_hit(position, reason, close_price)
+                        if fully_closed:
+                            return
             except asyncio.CancelledError:
                 raise
             except Exception as e:
@@ -359,8 +363,10 @@ class PositionMonitor:
                 if reason:
                     close_price = _hit_price(position, reason)
                     logger.info(f"[{symbol}] Gap-fill HIT: {reason} @ candle {ts}")
-                    await self._handle_hit(position, reason, close_price)
-                    return True
+                    fully_closed = await self._handle_hit(position, reason, close_price)
+                    if fully_closed:
+                        return True
+                    # partial TP — update ts and continue checking remaining candles
 
                 # Update last known ts even without a hit
                 self.state.state.monitor_ts[symbol] = ts
@@ -412,6 +418,13 @@ class PositionMonitor:
                     upnl = ep.get('unrealizedPnl')
                     if upnl is not None:
                         pos.unrealized_pnl = float(upnl)
+                    # Detect partial TP fill: amount on exchange has decreased
+                    if pos.take_levels and pos.take_amounts:
+                        raw = ep.get('contracts') or ep.get('amount') or ep.get('size')
+                        if raw is not None:
+                            ex_amount = abs(float(raw))
+                            if ex_amount > 0 and ex_amount < pos.amount * 0.99:
+                                await self._handle_partial_tp_trade(pos, ex_amount)
                 else:
                     # Gone from exchange — closed externally
                     close_price, reason = await self._detect_close_reason(pos)
@@ -420,6 +433,55 @@ class PositionMonitor:
 
         except Exception as e:
             logger.error(f"sync_with_exchange error: {e}")
+
+    async def _handle_partial_tp_trade(self, pos: Position, ex_amount: float) -> None:
+        """
+        A partial TP fill detected in trade mode: exchange amount < our tracked amount.
+
+        Determines how many TP levels were filled by accumulating take_amounts from
+        index 0 until the cumulative amount matches (pos.amount - ex_amount).
+        Fires on_position_closed for each filled level in order.
+
+        This correctly handles the gap case where multiple levels are filled between
+        two sync cycles (e.g. price jumped from below TP1 to above TP2).
+        """
+        remaining_to_explain = round(pos.amount - ex_amount, 8)
+        if remaining_to_explain <= 0:
+            return
+
+        accumulated = 0.0
+        filled_indices = []
+        for i, ta in enumerate(pos.take_amounts):
+            if accumulated >= remaining_to_explain * 0.99:
+                break
+            filled_indices.append(i)
+            accumulated = round(accumulated + ta, 8)
+
+        if not filled_indices:
+            logger.warning(
+                f"[{pos.symbol}] Partial TP: could not match any level "
+                f"(exchange: {ex_amount:.4f}, our: {pos.amount:.4f})"
+            )
+            return
+
+        logger.info(
+            f"[{pos.symbol}] Partial TP: {len(filled_indices)} level(s) filled "
+            f"(exchange: {ex_amount:.4f}, closed: {remaining_to_explain:.4f})"
+        )
+
+        # Fire callback for each filled level (always index 0 since each callback
+        # pops the front of the arrays).
+        for _ in filled_indices:
+            try:
+                # After each callback, pos.take_levels[0] is the level that was hit
+                tp_price = pos.take_levels[0] if pos.take_levels else pos.take_price
+                await self.on_position_closed(pos.symbol, 'tp_0', tp_price)
+            except Exception as e:
+                logger.error(f"[{pos.symbol}] partial TP trade callback error: {e}")
+                break
+            # If position was fully closed (last level), stop
+            if not self.state.has_position(pos.symbol):
+                break
 
     async def _detect_close_reason(self, position: Position):
         """
@@ -453,24 +515,29 @@ class PositionMonitor:
 
     async def _handle_hit(
         self, position: Position, reason: str, close_price: float
-    ) -> None:
+    ) -> bool:
         """
-        Delegate to agent callback which handles:
-          - state update (remove position, update stats)
-          - orphan order cancellation (trade mode)
-          - Telegram notification
+        Delegate to agent callback. Returns True if position was fully closed
+        (monitoring should stop), False if partial TP (monitoring continues).
         """
         symbol = position.symbol
-        emoji  = "🔴" if reason == "sl" else "🟢" if reason == "tp" else "⏹"
-        logger.info(f"{emoji} [{symbol}] {reason.upper()} hit @ {close_price:.4f}")
-
-        self._tasks.pop(symbol, None)
-        self.state.state.monitor_ts.pop(symbol, None)
+        if reason.startswith('tp_'):
+            logger.info(f"🟡 [{symbol}] {reason} hit @ {close_price:.4f}")
+        else:
+            emoji = "🔴" if reason == "sl" else "🟢" if reason == "tp" else "⏹"
+            logger.info(f"{emoji} [{symbol}] {reason.upper()} hit @ {close_price:.4f}")
 
         try:
             await self.on_position_closed(symbol, reason, close_price)
         except Exception as e:
             logger.error(f"[{symbol}] on_position_closed callback error: {e}")
+
+        # Position still in state → partial TP, monitoring continues
+        fully_closed = not self.state.has_position(symbol)
+        if fully_closed:
+            self._tasks.pop(symbol, None)
+            self.state.state.monitor_ts.pop(symbol, None)
+        return fully_closed
 
     # ─────────────────────────────────────
     # HELPERS
@@ -480,23 +547,24 @@ class PositionMonitor:
         self, position: Position, high: float, low: float
     ) -> Optional[str]:
         """
-        Return 'sl', 'tp', or None based on candle H/L vs position levels.
+        Return 'sl', 'tp', 'tp_N' (ladder level N), or None.
         SL is checked first (more conservative).
+        For ladder TP, levels are checked lowest-index first (closest to entry).
         """
         sl = position.stop_price
-        tp = position.take_price
-
         if sl > 0:
-            if position.side == PositionSide.LONG  and low  <= sl:
-                return 'sl'
-            if position.side == PositionSide.SHORT and high >= sl:
-                return 'sl'
+            if position.side == PositionSide.LONG  and low  <= sl: return 'sl'
+            if position.side == PositionSide.SHORT and high >= sl: return 'sl'
 
-        if tp > 0:
-            if position.side == PositionSide.LONG  and high >= tp:
-                return 'tp'
-            if position.side == PositionSide.SHORT and low  <= tp:
-                return 'tp'
+        # Ladder TP: check each level in order
+        if position.take_levels and position.take_amounts:
+            for i, tp_price in enumerate(position.take_levels):
+                if position.side == PositionSide.LONG  and high >= tp_price: return f'tp_{i}'
+                if position.side == PositionSide.SHORT and low  <= tp_price: return f'tp_{i}'
+        elif position.take_price > 0:
+            tp = position.take_price
+            if position.side == PositionSide.LONG  and high >= tp: return 'tp'
+            if position.side == PositionSide.SHORT and low  <= tp: return 'tp'
 
         return None
 
@@ -526,5 +594,13 @@ def _hit_price(position: Position, reason: str) -> float:
     if reason == 'sl':
         return position.stop_price if position.stop_price > 0 else position.entry_price
     if reason == 'tp':
+        return position.take_price if position.take_price > 0 else position.entry_price
+    if reason.startswith('tp_'):
+        try:
+            idx = int(reason[3:])
+            if idx < len(position.take_levels):
+                return position.take_levels[idx]
+        except (ValueError, IndexError):
+            pass
         return position.take_price if position.take_price > 0 else position.entry_price
     return position.entry_price

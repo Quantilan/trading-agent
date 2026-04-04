@@ -363,8 +363,29 @@ input[type=range]::-webkit-slider-thumb {
   align-items: center;
   justify-content: center;
 }
-#start-modal.open, #kill-modal.open { display: flex; }
+#start-modal.open, #kill-modal.open, #diff-modal.open { display: flex; }
 /* #save-modal.open { display: flex; } */
+#diff-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.65);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+}
+#diff-list {
+  max-height: 220px;
+  overflow-y: auto;
+  margin: 10px 0 4px;
+  background: var(--surface2);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+}
+.diff-row { font-size: 13px; padding: 4px 0; border-bottom: 1px solid var(--border); line-height: 1.5; }
+.diff-row:last-child { border-bottom: none; }
+.diff-old { color: var(--red); }
+.diff-new { color: var(--green); }
 #kill-modal {
   display: none;
   position: fixed;
@@ -542,7 +563,7 @@ input[type=range]::-webkit-slider-thumb {
 
         <div class="field">
           <label>Settlement Currency</label>
-          <select id="EXCHANGE_STBC">
+          <select id="EXCHANGE_STBC" onchange="onStbcChange()">
             <option value="">Auto-detect</option>
             <option value="USDT">USDT</option>
             <option value="USDC">USDC</option>
@@ -591,6 +612,20 @@ input[type=range]::-webkit-slider-thumb {
             <div style="font-size:13px; color:var(--muted); margin-bottom:6px">LIVE LOG</div>
             <div class="console" id="test-console"><span class="console-empty">Test output will appear here...</span></div>
           </div>
+
+          <!-- Coins availability (shown after connection test) -->
+          <div id="card-coins" style="display:none; margin-top:14px">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px">
+              <span style="font-size:13px; font-weight:600; color:var(--text)">Coins</span>
+              <span id="coins-header-info" style="font-size:12px; color:var(--muted)"></span>
+            </div>
+            <div id="coins-grid" style="
+              display: grid;
+              grid-template-columns: repeat(5, 1fr);
+              gap: 4px 8px;
+              font-size: 13px;
+            "></div>
+          </div>
         </div>
 
       </div>
@@ -610,7 +645,7 @@ input[type=range]::-webkit-slider-thumb {
             <span class="slider-value" id="v-MARGIN_PCT">4.0%</span>
           </div>
           <input type="range" id="MARGIN_PCT" min="1" max="10" step="0.5" value="4"
-                 oninput="document.getElementById('v-MARGIN_PCT').textContent = this.value + '%'">
+                 oninput="document.getElementById('v-MARGIN_PCT').textContent = this.value + '%'; checkMarginPositions()">
           <div class="slider-ticks"><span>1%</span><span>5%</span><span>10%</span></div>
         </div>
 
@@ -630,8 +665,13 @@ input[type=range]::-webkit-slider-thumb {
             <span class="slider-value" id="v-MAX_POSITIONS">7</span>
           </div>
           <input type="range" id="MAX_POSITIONS" min="1" max="20" step="1" value="7"
-                 oninput="document.getElementById('v-MAX_POSITIONS').textContent = this.value">
+                 oninput="document.getElementById('v-MAX_POSITIONS').textContent = this.value; checkMarginPositions()">
           <div class="slider-ticks"><span>1</span><span>10</span><span>20</span></div>
+        </div>
+
+        <div id="margin-positions-warn" style="display:none; margin-top:2px; padding:7px 10px;
+          background:rgba(251,191,36,.08); border:1px solid rgba(251,191,36,.35);
+          border-radius:6px; font-size:13px; color:#fbbf24; line-height:1.5">
         </div>
 
         <div class="field">
@@ -923,6 +963,20 @@ input[type=range]::-webkit-slider-thumb {
   </div>
 </div>
 
+<!-- .env diff modal -->
+<div id="diff-modal">
+  <div class="modal-box">
+    <h3>📝 Form differs from .env</h3>
+    <p style="font-size:14px; color:var(--muted); line-height:1.5; margin-bottom:2px">The following settings in the form differ from what is currently saved in <code>.env</code>:</p>
+    <div id="diff-list"></div>
+    <div class="modal-btn-row">
+      <button class="btn btn-primary"  onclick="diffConfirmSave()">💾 Save & overwrite .env</button>
+      <button class="btn btn-outline"  id="diff-btn-keep" onclick="diffKeepExisting()">↩ Keep existing .env</button>
+      <button class="btn btn-outline"  onclick="diffCancel()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div id="toast"></div>
 
@@ -936,6 +990,8 @@ let currentTestSSE = null;
 
 const testsPassed = { connection: false, orderTest: false, telegram: false, signal: false };
 let hasEnv = false;
+let _diffCallbackSave = null;
+let _diffCallbackKeep = null;
 
 
 const _testBtnMap = { connection:'btn-conn', orderTest:'btn-order-test', telegram:'btn-test-tg', signal:'btn-test-signal' };
@@ -1042,6 +1098,7 @@ async function loadConfig() {
 
     onExchangeChange();
     onParserModeChange();
+    checkMarginPositions();
 
   } catch(e) {
     console.error('loadConfig error', e);
@@ -1098,6 +1155,28 @@ function onExchangeChange() {
   // Show standard key/secret for non-HL
   document.getElementById('f-api-key').style.display    = ex === 'hyperliquid' ? 'none' : 'block';
   document.getElementById('f-api-secret').style.display = ex === 'hyperliquid' ? 'none' : 'block';
+}
+
+function onStbcChange() {
+  resetTests();
+}
+
+function checkMarginPositions() {
+  const warn   = document.getElementById('margin-positions-warn');
+  if (!warn) return;
+  const margin = parseFloat(document.getElementById('MARGIN_PCT').value) || 0;
+  const maxPos = parseInt(document.getElementById('MAX_POSITIONS').value)  || 1;
+  const used   = margin * maxPos;
+  // Safe max: floor(99 / maxPos) — leaves at least 1% free per position cycle
+  const safeMax = Math.floor(99 / maxPos);
+  if (used >= 100) {
+    warn.style.display = '';
+    warn.innerHTML =
+      `⚠️ <b>${maxPos} positions × ${margin}% = ${used}%</b> — exceeds 100% of balance.<br>` +
+      `Recommended max margin for ${maxPos} positions: <b>${safeMax}%</b>`;
+  } else {
+    warn.style.display = 'none';
+  }
 }
 
 function toggleSignalSource(src) {
@@ -1245,14 +1324,68 @@ function el(id) {
   return e ? e.value.trim() : '';
 }
 
+// ── .env diff check ──────────────────────────────────────────────────────────
+const _FIELD_LABELS = {
+  MODE:'Mode', EXCHANGE:'Exchange', MARGIN_PCT:'Margin %', LEVERAGE:'Leverage',
+  MAX_POSITIONS:'Max positions', PAPER_BALANCE:'Paper balance', EXCHANGE_STBC:'Stablecoin',
+  SIGNAL_SOURCE:'Signal source', PARSER_MODE:'Parser mode', CONFIRM_TRADE:'Confirm trade',
+  DEFAULT_SL_PCT:'Default SL %', LLM_PROVIDER:'LLM provider', LLM_MODEL:'LLM model',
+  CHART_TF:'Chart timeframe', CHART_BARS:'Chart bars', LOG_LEVEL:'Log level',
+  TG_CHAT_ID:'Telegram chat ID', SIGNAL_SERVER:'Signal server',
+};
+
+async function _checkDiffBeforeAction(onSaveAndProceed, onKeepAndProceed, keepBtnLabel) {
+  if (!hasEnv) { await onSaveAndProceed(); return; }
+  try {
+    const r = await fetch('/api/diff', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({fields: collectFields()}),
+    });
+    const d = await r.json();
+    if (!d.has_env || d.changed.length === 0) { await onSaveAndProceed(); return; }
+    _diffCallbackSave = onSaveAndProceed;
+    _diffCallbackKeep = onKeepAndProceed;
+    document.getElementById('diff-btn-keep').textContent = keepBtnLabel || '↩ Keep existing .env';
+    const list = document.getElementById('diff-list');
+    list.innerHTML = d.changed.map(c =>
+      c.masked
+        ? `<div class="diff-row">🔑 <b>${c.key}</b> — secret value changed</div>`
+        : `<div class="diff-row"><b>${_FIELD_LABELS[c.key] || c.key}</b>: <span class="diff-old">"${c.old}"</span> → <span class="diff-new">"${c.new}"</span></div>`
+    ).join('');
+    document.getElementById('diff-modal').classList.add('open');
+  } catch(e) {
+    await onSaveAndProceed(); // on error — proceed without check
+  }
+}
+
+async function diffConfirmSave() {
+  closeDiffModal();
+  const cb = _diffCallbackSave;
+  _diffCallbackSave = _diffCallbackKeep = null;
+  if (cb) await cb();
+}
+async function diffKeepExisting() {
+  closeDiffModal();
+  const cb = _diffCallbackKeep;
+  _diffCallbackSave = _diffCallbackKeep = null;
+  if (cb) await cb();
+}
+function diffCancel() {
+  closeDiffModal();
+  _diffCallbackSave = _diffCallbackKeep = null;
+}
+function closeDiffModal() {
+  document.getElementById('diff-modal').classList.remove('open');
+}
+
 // ── Save .env ────────────────────────────────────────────────────────────────
 async function saveEnv() {
-  const anyTestPassed = Object.values(testsPassed).some(v => v);
-  /*if (testsAttempted) {
-    document.getElementById('save-modal').classList.add('open');
-    return;
-  }*/
-  await doSaveEnv();
+  await _checkDiffBeforeAction(
+    async () => await doSaveEnv(),
+    async () => showToast('ℹ️ .env unchanged — using saved values', 'ok'),
+    '↩ Keep existing .env',
+  );
 }
 
 async function confirmSave() {
@@ -1306,6 +1439,9 @@ function resetTests() {
   setChip('ci-exchange', 'Exchange —');
   setChip('ci-balance',  'Balance —');
   setChip('ci-mode',     'Mode —');
+  // Hide coins block
+  const coinsCard = document.getElementById('card-coins');
+  if (coinsCard) coinsCard.style.display = 'none';
   // Reset readiness checklist items to idle
   ['chk-connection','chk-ordertest','chk-telegram','chk-signal'].forEach(id => {
     const el = document.getElementById(id);
@@ -1327,6 +1463,33 @@ function setChip(id, text, cls = 'idle') {
   if (!el) return;
   el.textContent = text;
   el.className = 'test-chip' + (cls !== 'idle' ? ' ' + cls : '');
+}
+
+// ── Coins block ──────────────────────────────────────────────────────────────
+function renderCoins(coins, stbc) {
+  const card   = document.getElementById('card-coins');
+  const grid   = document.getElementById('coins-grid');
+  const header = document.getElementById('coins-header-info');
+  if (!card || !grid) return;
+
+  const entries = Object.entries(coins).sort((a, b) => a[0].localeCompare(b[0]));
+  const total   = entries.length;
+  const avail   = entries.filter(([, c]) => c.available).length;
+  const unavail = total - avail;
+
+  header.innerHTML =
+    `<span style="background:rgba(56,189,248,.15); color:#38bdf8; padding:1px 6px; border-radius:4px; font-weight:600; margin-right:4px">${stbc}</span>` +
+    `<span>${avail}/${total} available` +
+    (unavail > 0 ? ` · <span style="color:var(--red)">${unavail} missing</span>` : '') +
+    `</span>`;
+
+  grid.innerHTML = entries.map(([sym, c]) => {
+    const icon  = c.available ? '<span style="color:var(--green)">✓</span>' : '<span style="color:var(--red)">✗</span>';
+    const color = c.available ? '' : 'color:var(--muted)';
+    return `<div style="${color}">${icon} ${sym}</div>`;
+  }).join('');
+
+  card.style.display = '';
 }
 
 // ── Test Connection ──────────────────────────────────────────────────────────
@@ -1352,6 +1515,7 @@ async function testConnection() {
       setChip('ci-mode',     d.pos_mode === 'paper' ? '📋 Paper' : d.pos_mode, 'ok');
       markTest('connection', true);
       showToast('✅ Connection successful', 'ok');
+      if (d.coins) renderCoins(d.coins, d.stbc);
     } else {
       setChip('ci-exchange', '❌ ' + d.error, 'fail');
       setChip('ci-balance',  '—');
@@ -1463,13 +1627,13 @@ async function startOrderTest() {
   const cons = document.getElementById('test-console');
   cons.innerHTML = '';
 
-  if (currentTestSSE) { currentTestSSE.close(); currentTestSSE = null; }
+  if (currentTestSSE) { clearInterval(currentTestSSE); currentTestSSE = null; }
 
   try {
     const fields = collectFields();
     const symbol = document.getElementById('test-symbol').value.trim().toUpperCase() || 'ETH';
     const side   = document.getElementById('test-side').value;
-    const mode   = getRadioValue('MODE') || 'trade';   // always matches the selected trading mode
+    const mode   = getRadioValue('MODE') || 'trade';
 
     // Start test
     const r = await fetch('/api/test/exchange', {
@@ -1483,26 +1647,31 @@ async function startOrderTest() {
       return;
     }
 
-    // Subscribe to SSE stream
-    currentTestSSE = new EventSource(`/api/test/stream/${d.test_id}`);
-    currentTestSSE.onmessage = (e) => {
-      const item = JSON.parse(e.data);
-      if (item.type === 'ping') return;
-      appendLog(cons, item);
-      if (item.type === 'done') {
-        currentTestSSE.close();
+    // Poll for log lines every 400ms — more reliable than SSE over SSH tunnels / proxies
+    const testId = d.test_id;
+    currentTestSSE = setInterval(async () => {
+      try {
+        const pr = await fetch(`/api/test/poll/${testId}`);
+        const pd = await pr.json();
+        for (const item of pd.items) {
+          appendLog(cons, item);
+        }
+        if (pd.done || pd.expired) {
+          clearInterval(currentTestSSE);
+          currentTestSSE = null;
+          const last = pd.items[pd.items.length - 1];
+          if (last) markTest('orderTest', last.ok === true);
+          btn.classList.remove('loading');
+          btn.disabled = false;
+        }
+      } catch(e) {
+        clearInterval(currentTestSSE);
         currentTestSSE = null;
-        markTest('orderTest', item.ok === true);
+        appendLog(cons, {type:'done', ok:false, msg:'Poll error: ' + e.message});
         btn.classList.remove('loading');
         btn.disabled = false;
       }
-    };
-    currentTestSSE.onerror = () => {
-      appendLog(cons, {type:'done', ok:false, msg:'Stream connection lost'});
-      currentTestSSE.close();
-      btn.classList.remove('loading');
-      btn.disabled = false;
-    };
+    }, 400);
 
   } catch(e) {
     appendLog(cons, {type:'log', level:'error', msg: e.message});
@@ -1534,7 +1703,7 @@ function appendLog(cons, item) {
 function clearLog() {
   const cons = document.getElementById('test-console');
   cons.innerHTML = '<span class="console-empty">Test output will appear here...</span>';
-  if (currentTestSSE) { currentTestSSE.close(); currentTestSSE = null; }
+  if (currentTestSSE) { clearInterval(currentTestSSE); currentTestSSE = null; }
 }
 
 // ── Agent control ────────────────────────────────────────────────────────────
@@ -1652,16 +1821,24 @@ async function startAgent() {
 }
 
 async function doStartAgent() {
-  // Auto-save .env before starting so the agent always uses current GUI state.
-  // Silent — no toast, non-fatal if it fails.
-  try {
-    await fetch('/api/save', {
-      method:  'POST',
-      headers: {'Content-Type': 'application/json'},
-      body:    JSON.stringify({fields: collectFields()}),
-    });
-  } catch (_) {}
+  await _checkDiffBeforeAction(
+    async () => {
+      // Save current form values then start
+      try {
+        await fetch('/api/save', {
+          method:  'POST',
+          headers: {'Content-Type': 'application/json'},
+          body:    JSON.stringify({fields: collectFields()}),
+        });
+      } catch (_) {}
+      await _doActualStart();
+    },
+    async () => await _doActualStart(), // Start without overwriting .env
+    '↩ Start with existing .env',
+  );
+}
 
+async function _doActualStart() {
   const r = await fetch('/api/agent/start', {method:'POST'});
   const d = await r.json();
   if (d.ok) {

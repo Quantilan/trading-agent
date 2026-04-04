@@ -37,6 +37,7 @@ class RiskManager:
         price_precision: int   = 4,
         amount_step:   float   = 0.001,
         min_notional:  float   = 5.0,
+        max_amount:    float   = 0.0,
     ) -> Tuple[OrderParams, str]:
         """
         Calculate order parameters.
@@ -70,6 +71,15 @@ class RiskManager:
         if amount <= 0:
             return None, f"Calculated amount is zero (volume={volume}, price={price}, step={amount_step})"
 
+        # ── Max amount cap (exchange hard limit) ─
+        if max_amount > 0 and amount > max_amount:
+            logger.warning(
+                f"[RiskManager] {signal.symbol} amount {amount} exceeds exchange max {max_amount} — capping"
+            )
+            amount = self._floor_to_step(max_amount, amount_step)
+            volume = round(amount * price, 2)
+            margin = round(volume / self.config.leverage, 2)
+
         # ── SL/TP calculation ────────────
         # Absolute prices from signal take priority (Telegram/LLM signals).
         # Fall back to percentage-based calculation (server signals).
@@ -102,7 +112,7 @@ class RiskManager:
         # ── TP ladder (multiple levels) ──
         take_levels = []
         if signal.take_levels:
-            ratios      = [1.0] * len(signal.take_levels)   # equal split
+            ratios      = signal.take_proportions if signal.take_proportions else [1.0] * len(signal.take_levels)
             amounts     = self.split_amounts(amount, ratios, amount_step)
             take_levels = [
                 (round(level[0] if isinstance(level, (list, tuple)) else level, price_precision), a)

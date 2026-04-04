@@ -7,6 +7,13 @@
 # Database & state
 *.db
 state_*.json
+agent_state.json
+
+# User coin overrides
+coins.json
+
+# Cache
+.cache/
 
 # Python
 __pycache__/

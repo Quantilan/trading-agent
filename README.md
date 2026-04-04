@@ -12,7 +12,7 @@
 
 ## ⚡ Quick Start
 
-### 🪟 Very simple test (recommended for Windows)
+### 🪟 Quick Start on Windows
 
 1. Download ZIP:  
    👉 https://github.com/Quantilan/trading-agent/archive/refs/heads/main.zip
@@ -21,7 +21,7 @@
 
 3. Double-click `start.bat`
 
-✅ Done! The GUI will open and the bot will start.
+✅ Done! Dependencies install automatically on the first run, then the browser opens at **http://localhost:8080** — configure and start the agent.
 
 ###  Makefile 
 
@@ -51,7 +51,7 @@ Quantilan Trading Agent is an autonomous cryptocurrency trading bot that runs on
 - ⚡ **24/7 Trading** — works continuously on your own infrastructure
 - 🎛️ **Setup GUI** — browser-based configuration, connection tests, live agent logs
 - 🎯 **Multi-Exchange** — Binance, Bybit, Hyperliquid, OKX
-- 📊 **Risk Management** — position sizing, stop-loss, take-profit, max positions limit
+- 📊 **Risk Management** — position sizing, stop-loss, ladder take-profit, max positions limit
 - 💬 **Personal Bot Control** — manage via your own Telegram bot: positions, P&L, equity chart
 - 🔍 **Signal Parsing** — forward any Telegram channel to your bot or write commands in plain language
 - 🐳 **Docker Compose** — one-command deployment
@@ -102,19 +102,44 @@ Quantilan Trading Agent is an autonomous cryptocurrency trading bot that runs on
 
 ## Quick Start
 
-### Option A — Docker (recommended for VPS)
+### 🖥 VPS / Linux Server (recommended)
+
+**Step 1 — install on the server** (fresh Ubuntu/Debian):
 
 ```bash
-git clone https://github.com/Quantilan/trading-agent.git
-cd trading-agent
-
-make setup      # creates .env from template
-make gui        # open http://your-server:8080 to configure
-make start      # launch agent in background
-make logs       # watch live output
+curl -fsSL https://raw.githubusercontent.com/Quantilan/trading-agent/main/install.sh | bash
 ```
 
-### Option B — Python directly
+This installs Docker, clones the repo, builds the image, and prints the next steps.
+
+**Step 2 — open the GUI via SSH tunnel** (on your local machine):
+
+```bash
+ssh -L 8080:localhost:8080 user@your-server-ip
+```
+
+No firewall port opening needed — the tunnel forwards the GUI securely.  
+Not sure of the exact command? Run `make tunnel` on the server.
+
+**Step 3 — configure in your browser:**
+
+```
+http://localhost:8080
+```
+
+Fill in exchange credentials, Telegram bot, signal source — then click **Start Agent**.
+
+**Step 4 — run agent in background:**
+
+```bash
+# on the server
+make start
+make logs     # watch live output
+```
+
+---
+
+### 🐍 Python directly (local / dev)
 
 ```bash
 git clone https://github.com/Quantilan/trading-agent.git
@@ -122,8 +147,8 @@ cd trading-agent
 
 pip install -r requirements.txt
 
-python setup_gui.py   # open http://localhost:8080 to configure
-# — or edit .env manually —
+python setup_gui.py   # opens http://localhost:8080 automatically
+# — or edit .env manually, then:
 python main.py
 ```
 
@@ -182,14 +207,15 @@ Clicking **Start Agent** with unchecked items shows a warning with specific reco
 
 ### Prerequisites
 
-- Docker + Docker Compose installed
-- Port 8080 open for GUI (can be closed after setup)
+- Docker + Docker Compose installed  
+  *(Ubuntu/Debian: `curl -fsSL https://get.docker.com | sh`)*
 
 ### Commands
 
 ```bash
 make setup      # first-time init: .env + state files
-make gui        # start Setup GUI at :8080, stop with Ctrl+C when done
+make tunnel     # print SSH tunnel command for remote GUI access
+make gui        # start Setup GUI (bound to 127.0.0.1 — access via SSH tunnel)
 make start      # start agent in background (auto-restart on crash)
 make stop       # stop agent
 make restart    # restart agent (reloads .env)
@@ -198,6 +224,9 @@ make status     # show container status
 make build      # rebuild image after code changes
 make clean      # remove containers and image
 ```
+
+> **GUI is bound to `127.0.0.1` only** — it is never exposed publicly.  
+> Access it by forwarding port 8080 via SSH tunnel from your local machine.
 
 ### Data persistence
 
@@ -245,6 +274,13 @@ SIGNAL_SERVER=wss://signals.quantilan.com
 # ── Signal parsing (telegram mode) ────────────────────────
 PARSER_MODE=regex         # regex | llm
 CONFIRM_TRADE=true
+DEFAULT_SL_PCT=2.0        # fallback SL when not in signal
+
+# ── Entry zone (deferred entries) ──────────────────────────
+ENTRY_TOLERANCE=0.1       # ±% tolerance around entry zone
+PENDING_ENTRY_TIMEOUT=24  # hours before pending entry expires
+
+# ── LLM parser ─────────────────────────────────────────────
 # LLM_PROVIDER=claude
 # LLM_API_KEY=sk-ant-...
 
@@ -259,7 +295,8 @@ CHART_BARS=50             # 25 | 50 | 75 | 100
 
 ```
 /start        — agent status, balance, open positions count
-/positions    — open positions with unrealized P&L
+/positions    — open positions with P&L (sends PNG image report)
+/pending      — deferred entries waiting for price to reach entry zone
 /pnl          — P&L statistics: wins, losses, win rate
 /equity       — equity curve chart
 /stop         — pause trading (keep positions open)
@@ -309,20 +346,25 @@ Supported actions: **LONG / SHORT / FLAT / MODIFY_SL / MODIFY_TP**
 trading-agent/
 ├── agent/
 │   ├── signal_parser/     # Regex patterns & validation rules
+│   ├── chart.py           # Candlestick chart rendering (Telegram notifications)
+│   ├── coins.py           # Supported coins registry per exchange
 │   ├── config.py          # Config loader (.env → AgentConfig)
 │   ├── daily_secret.py    # Rotating HMAC key from license server
 │   ├── license.py         # License validation + device binding
 │   ├── main.py            # Agent orchestrator
 │   ├── order_executor.py  # Exchange interaction (ccxt)
 │   ├── personal_bot.py    # Telegram control bot
-│   ├── risk_manager.py    # Position sizing, SL/TP logic
+│   ├── pnl_image.py       # P&L image report generator (matplotlib)
+│   ├── position_monitor.py # SL/TP monitoring — WebSocket (paper) + exchange sync (trade)
+│   ├── price_watcher.py   # Deferred entry watcher — WebSocket price monitoring
+│   ├── risk_manager.py    # Position sizing, SL/TP logic, ladder TP
 │   ├── signal_client.py   # WebSocket signal receiver
 │   └── state.py           # JSON state persistence
 │
 ├── gui/
 │   ├── templates/
 │   │   └── index.html     # Single-page setup UI
-│   ├── app.py             # FastAPI backend (REST + SSE log stream)
+│   ├── app.py             # FastAPI backend (REST + polling log stream)
 │   └── env_manager.py     # Safe .env read/write
 │
 ├── tests/
@@ -356,9 +398,12 @@ Get a license key: [@quantilan_bot](https://t.me/quantilan_bot)
 
 - [x] Multi-exchange execution (Binance, Bybit, Hyperliquid, OKX)
 - [x] Personal Telegram bot with P&L, equity chart
-- [x] Signal parsing — regex + LLM (Claude)
+- [x] Signal parsing — regex + LLM (Claude), RU/EN/UA
 - [x] Forwarded message support (Telegram Premium)
 - [x] SL/TP validation and trailing stop protection
+- [x] Ladder take-profit — multiple TP levels with partial closes
+- [x] Deferred entry zones — wait for price to reach entry range
+- [x] P&L image report via /positions
 - [x] Browser-based Setup GUI with live connection tests
 - [x] Docker Compose deployment
 - [ ] Strategy marketplace

@@ -34,7 +34,7 @@ _PATTERNS_FILE = Path(__file__).parent / "patterns.json"
 
 class RegexParser:
 
-    def __init__(self, patterns_path: str = ""):
+    def __init__(self, patterns_path: str = "", extra_symbols: list = None):
         path = Path(patterns_path) if patterns_path else _PATTERNS_FILE
         with open(path, encoding="utf-8") as f:
             p = json.load(f)
@@ -47,6 +47,22 @@ class RegexParser:
             key=lambda x: -len(x[0]),
         )
         self._size_kw = p.get("size_keywords", {})
+
+        # Merge extra coins from coins.json (user list).
+        # We only add coins not already covered by patterns.json aliases.
+        # No alternative names for user-added coins — they must use the exact ticker.
+        if extra_symbols:
+            existing_canonical = {v for _, v in self._symbols}
+            added = 0
+            for coin in extra_symbols:
+                coin = str(coin).upper().strip()
+                if coin and coin not in existing_canonical:
+                    self._symbols.append((coin.lower(), coin))
+                    added += 1
+            if added:
+                # Re-sort to keep longest-first matching intact
+                self._symbols.sort(key=lambda x: -len(x[0]))
+                logger.debug(f"[Parser] Added {added} extra coins from coins.json")
 
     # ─────────────────────────────────────────
     # PUBLIC
@@ -64,7 +80,8 @@ class RegexParser:
         symbol = self._detect_symbol(t)
         if action in ("open", "close") and not symbol: return None
 
-        # 4. Numerical data extraction (SL/TP)
+        # 4. Numerical data extraction (entry / SL / TP)
+        entry_min, entry_max = self._extract_entry(t)
         sl_pct, sl_abs = self._extract_sl(t)
         tp_pct, tp_abs = self._extract_tp(t)
 
@@ -99,12 +116,18 @@ class RegexParser:
         final_take = tp_abs[0] if (isinstance(tp_abs, list) and tp_abs) else 0.0
         
         # 8. Build Signal object
+        # entry_min set → deferred entry (wait for price)
+        # entry_min == 0 → immediate market entry
+        entry_mid = round((entry_min + entry_max) / 2, 8) if entry_min > 0 else 0.0
+
         signal = Signal(
             id               = str(uuid.uuid4())[:8],
             symbol           = symbol,
             action           = sig_action,
-            entry            = 0.0,
-            entry_type       = "market",
+            entry            = entry_mid,
+            entry_type       = "market" if entry_min == 0 else "deferred",
+            entry_min        = entry_min,
+            entry_max        = entry_max if entry_max > 0 else entry_min,
             sl_pct           = sl_pct if sl_pct > 0 else (default_sl_pct / 100 if final_stop == 0 else 0.0),
             stop_price       = final_stop,
             take_price       = final_take,
@@ -231,3 +254,41 @@ class RegexParser:
             except ValueError: continue
                 
         return 0.0, levels
+
+    def _extract_entry(self, text: str) -> Tuple[float, float]:
+        """
+        Extract entry price or range from signal text.
+        Returns (entry_min, entry_max).
+        Single price  → (price, 0.0)
+        Range X - Y   → (min(X,Y), max(X,Y))
+        Not found     → (0.0, 0.0)
+
+        Matches patterns like:
+          entry: 2.927 - 2.702
+          entry price: 68000
+          точка входу: 2.927 - 2.702
+          вход: 1.25
+          enter: 2050
+        """
+        # Keywords: EN + UA + RU
+        # UA: вхід (nom) / входу (gen, used in "точка входу") / вхідна (adj)
+        pattern = (
+            r"(?i)"
+            r"(?:entry\s*(?:price|point|zone)?|точка\s*вход[уаіia]?|вхід[а-яіa]*|вход[аеиу]?|enter)"
+            r"\s*[:\-]?\s*"
+            r"([\d.]+)"
+            r"(?:\s*[-–—]\s*([\d.]+))?"
+        )
+        match = re.search(pattern, text)
+        if not match:
+            return 0.0, 0.0
+
+        try:
+            v1 = float(match.group(1))
+            v2 = float(match.group(2)) if match.group(2) else 0.0
+        except (ValueError, TypeError):
+            return 0.0, 0.0
+
+        if v2 > 0:
+            return min(v1, v2), max(v1, v2)
+        return v1, 0.0

@@ -180,10 +180,10 @@ async def test_exchange(
 
         # ── STEP 3: Market params ─────────────────────────
         logger.info(f"⏳ STEP 3: Market params for {symbol}...")
-        price_prec, amount_step, min_notional = executor.get_market_params(symbol)
+        price_prec, amount_step, min_notional, max_amount = executor.get_market_params(symbol)
         logger.info(
             f"✅ price_prec={price_prec}  amount_step={amount_step}  "
-            f"min_notional={min_notional}"
+            f"min_notional={min_notional}  max_amount={max_amount or 'unlimited'}"
         )
 
         # ── STEP 4: Current price ─────────────────────────
@@ -291,117 +291,142 @@ async def test_exchange(
             logger.info("📋 [PAPER] Order verification skipped")
         elif pos_id:
             try:
-                ms_sym = executor._ms(symbol)
+                ms_sym       = executor._ms(symbol)
+                sl_ok        = False
+                tp_ok        = False
+                direction_ok = True
 
-                # Bybit and Hyperliquid use position-level SL/TP (setTradingStop / TP_SL algo).
-                # These do NOT appear in fetch_open_orders — they are stored on the position itself.
-                position_level_sl = config.exchange in ('bybit', 'hyperliquid')
-
-                if position_level_sl:
-                    # Verify via fetch_positions: check stopLossPrice / takeProfitPrice
-                    positions = await executor.exchange.fetch_positions([ms_sym])
-                    pos = next((p for p in positions if p.get('contracts', 0) != 0), None)
-                    sl_price_actual = float(pos.get('stopLossPrice') or 0) if pos else 0
-                    tp_price_actual = float(pos.get('takeProfitPrice') or 0) if pos else 0
-
-                    sl_ok       = bool(stop_id) and sl_price_actual > 0
-                    tp_ok       = bool(take_ids) and tp_price_actual > 0
-                    direction_ok = True
-                    if sl_price_actual and side == PositionSide.LONG and sl_price_actual >= price:
-                        logger.error(f"❌ SL {sl_price_actual} is ABOVE entry {price} for LONG!")
+                if config.exchange == 'bybit':
+                    # Bybit: position-level SL/TP set via setTradingStop — stored on position
+                    positions    = await executor.exchange.fetch_positions([ms_sym])
+                    pos_data     = next((p for p in positions if p.get('contracts', 0) != 0), None)
+                    sl_price_act = float(pos_data.get('stopLossPrice')   or 0) if pos_data else 0
+                    tp_price_act = float(pos_data.get('takeProfitPrice') or 0) if pos_data else 0
+                    sl_ok = bool(stop_id) and sl_price_act > 0
+                    tp_ok = bool(take_ids) and tp_price_act > 0
+                    if sl_price_act and side == PositionSide.LONG  and sl_price_act >= price:
+                        logger.error(f"❌ SL {sl_price_act} ABOVE entry {price} for LONG!")
                         direction_ok = False
-                    if sl_price_actual and side == PositionSide.SHORT and sl_price_actual <= price:
-                        logger.error(f"❌ SL {sl_price_actual} is BELOW entry {price} for SHORT!")
+                    if sl_price_act and side == PositionSide.SHORT and sl_price_act <= price:
+                        logger.error(f"❌ SL {sl_price_act} BELOW entry {price} for SHORT!")
                         direction_ok = False
-                    if tp_price_actual and side == PositionSide.LONG and tp_price_actual <= price:
-                        logger.error(f"❌ TP {tp_price_actual} is BELOW entry {price} for LONG!")
+                    if tp_price_act and side == PositionSide.LONG  and tp_price_act <= price:
+                        logger.error(f"❌ TP {tp_price_act} BELOW entry {price} for LONG!")
                         direction_ok = False
-                    if tp_price_actual and side == PositionSide.SHORT and tp_price_actual >= price:
-                        logger.error(f"❌ TP {tp_price_actual} is ABOVE entry {price} for SHORT!")
+                    if tp_price_act and side == PositionSide.SHORT and tp_price_act >= price:
+                        logger.error(f"❌ TP {tp_price_act} ABOVE entry {price} for SHORT!")
                         direction_ok = False
-
                     logger.info(
-                        f"✅ Position SL/TP: "
-                        f"SL={sl_price_actual if sl_ok else '❌ not set'} | "
-                        f"TP={tp_price_actual if tp_ok else '❌ not set'} | "
+                        f"✅ Bybit position SL/TP: "
+                        f"SL={sl_price_act if sl_ok else '❌ not set'} | "
+                        f"TP={tp_price_act if tp_ok else '❌ not set'} | "
                         f"Direction={'✅' if direction_ok else '❌ wrong'}"
                     )
 
-                else:
-                    # OKX: conditional algo orders don't appear in fetch_open_orders —
-                    # verify each order individually by ID using fetch_order + stop=True flag.
-                    # Other exchanges: use fetch_open_orders and match by ID.
-                    if config.exchange == 'okx':
-                        sl_ok = False
-                        tp_ok = False
-                        direction_ok = True
-                        if stop_id:
-                            try:
-                                o = await executor.exchange.fetch_order(stop_id, ms_sym, {'stop': True})
-                                sl_ok = o.get('status') in ('open', 'live', 'untriggered')
-                                o_price = float(o.get('stopPrice') or o.get('triggerPrice') or 0)
-                                if o_price and side == PositionSide.LONG and o_price >= price:
-                                    logger.error(f"❌ SL {o_price} is ABOVE entry {price} for LONG!")
-                                    direction_ok = False
-                                if o_price and side == PositionSide.SHORT and o_price <= price:
-                                    logger.error(f"❌ SL {o_price} is BELOW entry {price} for SHORT!")
-                                    direction_ok = False
-                            except Exception as e:
-                                logger.warning(f"⚠️  fetch SL order: {e}")
-                        if take_ids:
-                            try:
-                                o = await executor.exchange.fetch_order(take_ids[0], ms_sym, {'stop': True})
-                                tp_ok = o.get('status') in ('open', 'live', 'untriggered')
-                                o_price = float(o.get('stopPrice') or o.get('triggerPrice') or 0)
-                                if o_price and side == PositionSide.LONG and o_price <= price:
-                                    logger.error(f"❌ TP {o_price} is BELOW entry {price} for LONG!")
-                                    direction_ok = False
-                                if o_price and side == PositionSide.SHORT and o_price >= price:
-                                    logger.error(f"❌ TP {o_price} is ABOVE entry {price} for SHORT!")
-                                    direction_ok = False
-                            except Exception as e:
-                                logger.warning(f"⚠️  fetch TP order: {e}")
-                        logger.info(
-                            f"✅ OKX algo orders: "
-                            f"SL={'✅' if sl_ok else '❌ not found'} | "
-                            f"TP={'✅' if tp_ok else '❌ not found'} | "
-                            f"Direction={'✅' if direction_ok else '❌ wrong'}"
-                        )
-                    else:
-                        open_orders = await executor.exchange.fetch_open_orders(ms_sym)
+                elif config.exchange == 'hyperliquid':
+                    # HL: TP_SL algo orders appear in fetch_open_orders (NOT in fetch_positions)
+                    hl_orders = await executor.exchange.fetch_open_orders(ms_sym)
+                    sl_ok = bool(stop_id)  and any(str(o.get('id')) == str(stop_id)      for o in hl_orders)
+                    tp_ok = bool(take_ids) and any(str(o.get('id')) == str(take_ids[0])  for o in hl_orders)
+                    for o in hl_orders:
+                        o_price = float(o.get('stopPrice') or o.get('triggerPrice') or o.get('price') or 0)
+                        o_id    = str(o.get('id', ''))
+                        if o_price and stop_id and o_id == str(stop_id):
+                            if side == PositionSide.LONG  and o_price >= price:
+                                logger.error(f"❌ SL {o_price} ABOVE entry {price} for LONG!")
+                                direction_ok = False
+                            if side == PositionSide.SHORT and o_price <= price:
+                                logger.error(f"❌ SL {o_price} BELOW entry {price} for SHORT!")
+                                direction_ok = False
+                        if o_price and take_ids and o_id == str(take_ids[0]):
+                            if side == PositionSide.LONG  and o_price <= price:
+                                logger.error(f"❌ TP {o_price} BELOW entry {price} for LONG!")
+                                direction_ok = False
+                            if side == PositionSide.SHORT and o_price >= price:
+                                logger.error(f"❌ TP {o_price} ABOVE entry {price} for SHORT!")
+                                direction_ok = False
+                    logger.info(
+                        f"✅ HL algo orders: {len(hl_orders)} open | "
+                        f"SL={'✅' if sl_ok else '❌ not found'} | "
+                        f"TP={'✅' if tp_ok else '❌ not found'} | "
+                        f"Direction={'✅' if direction_ok else '❌ wrong'}"
+                    )
 
-                        sl_ok = stop_id and any(
-                            str(o.get('id')) == str(stop_id) for o in open_orders
+                elif config.exchange == 'binance':
+                    # Binance USDM: STOP_MARKET/TAKE_PROFIT_MARKET are algo orders tracked
+                    # by algoId — they appear in /fapi/v1/openAlgoOrders, NOT fetch_open_orders.
+                    market_id   = executor.exchange.market(ms_sym)['id']
+                    try:
+                        algo_orders = await executor.exchange.fapiPrivateGetOpenAlgoOrders(
+                            {'symbol': market_id}
                         )
-                        tp_ok = take_ids and any(
-                            str(o.get('id')) == str(take_ids[0]) for o in open_orders
-                        )
+                    except Exception as e:
+                        logger.warning(f"⚠️  fapiPrivateGetOpenAlgoOrders failed: {e}")
+                        algo_orders = []
+                    sl_ok = bool(stop_id)  and any(
+                        str(o.get('algoId', '')) == str(stop_id)     for o in algo_orders
+                    )
+                    tp_ok = bool(take_ids) and any(
+                        str(o.get('algoId', '')) == str(take_ids[0]) for o in algo_orders
+                    )
+                    for o in algo_orders:
+                        o_price    = float(o.get('stopPrice') or o.get('triggerPrice') or 0)
+                        o_algo_id  = str(o.get('algoId', ''))
+                        if o_price and stop_id and o_algo_id == str(stop_id):
+                            if side == PositionSide.LONG  and o_price >= price:
+                                logger.error(f"❌ SL {o_price} ABOVE entry {price} for LONG!")
+                                direction_ok = False
+                            if side == PositionSide.SHORT and o_price <= price:
+                                logger.error(f"❌ SL {o_price} BELOW entry {price} for SHORT!")
+                                direction_ok = False
+                        if o_price and take_ids and o_algo_id == str(take_ids[0]):
+                            if side == PositionSide.LONG  and o_price <= price:
+                                logger.error(f"❌ TP {o_price} BELOW entry {price} for LONG!")
+                                direction_ok = False
+                            if side == PositionSide.SHORT and o_price >= price:
+                                logger.error(f"❌ TP {o_price} ABOVE entry {price} for SHORT!")
+                                direction_ok = False
+                    logger.info(
+                        f"✅ Binance algo orders: {len(algo_orders)} open | "
+                        f"SL={'✅' if sl_ok else '❌ not found'} | "
+                        f"TP={'✅' if tp_ok else '❌ not found'} | "
+                        f"Direction={'✅' if direction_ok else '❌ wrong'}"
+                    )
 
-                        direction_ok = True
-                        for o in open_orders:
-                            o_price = o.get('stopPrice') or o.get('price') or 0
-                            o_id    = str(o.get('id', ''))
-                            if o_price and stop_id and o_id == str(stop_id):
-                                if side == PositionSide.LONG and o_price >= price:
-                                    logger.error(f"❌ SL price {o_price} is ABOVE entry {price} for LONG!")
-                                    direction_ok = False
-                                elif side == PositionSide.SHORT and o_price <= price:
-                                    logger.error(f"❌ SL price {o_price} is BELOW entry {price} for SHORT!")
-                                    direction_ok = False
-                            if o_price and take_ids and o_id == str(take_ids[0]):
-                                if side == PositionSide.LONG and o_price <= price:
-                                    logger.error(f"❌ TP price {o_price} is BELOW entry {price} for LONG!")
-                                    direction_ok = False
-                                elif side == PositionSide.SHORT and o_price >= price:
-                                    logger.error(f"❌ TP price {o_price} is ABOVE entry {price} for SHORT!")
-                                    direction_ok = False
-
-                        logger.info(
-                            f"✅ Orders on exchange: {len(open_orders)} open | "
-                            f"SL={'✅' if sl_ok else '❌ not found'} | "
-                            f"TP={'✅' if tp_ok else '❌ not found'} | "
-                            f"Direction={'✅' if direction_ok else '❌ wrong'}"
-                        )
+                elif config.exchange == 'okx':
+                    # OKX: conditional algo orders — fetch each by ID with stop=True flag
+                    if stop_id:
+                        try:
+                            o = await executor.exchange.fetch_order(stop_id, ms_sym, {'stop': True})
+                            sl_ok   = o.get('status') in ('open', 'live', 'untriggered')
+                            o_price = float(o.get('stopPrice') or o.get('triggerPrice') or 0)
+                            if o_price and side == PositionSide.LONG  and o_price >= price:
+                                logger.error(f"❌ SL {o_price} ABOVE entry {price} for LONG!")
+                                direction_ok = False
+                            if o_price and side == PositionSide.SHORT and o_price <= price:
+                                logger.error(f"❌ SL {o_price} BELOW entry {price} for SHORT!")
+                                direction_ok = False
+                        except Exception as e:
+                            logger.warning(f"⚠️  fetch SL order OKX: {e}")
+                    if take_ids:
+                        try:
+                            o = await executor.exchange.fetch_order(take_ids[0], ms_sym, {'stop': True})
+                            tp_ok   = o.get('status') in ('open', 'live', 'untriggered')
+                            o_price = float(o.get('stopPrice') or o.get('triggerPrice') or 0)
+                            if o_price and side == PositionSide.LONG  and o_price <= price:
+                                logger.error(f"❌ TP {o_price} BELOW entry {price} for LONG!")
+                                direction_ok = False
+                            if o_price and side == PositionSide.SHORT and o_price >= price:
+                                logger.error(f"❌ TP {o_price} ABOVE entry {price} for SHORT!")
+                                direction_ok = False
+                        except Exception as e:
+                            logger.warning(f"⚠️  fetch TP order OKX: {e}")
+                    logger.info(
+                        f"✅ OKX algo orders: "
+                        f"SL={'✅' if sl_ok else '❌ not found'} | "
+                        f"TP={'✅' if tp_ok else '❌ not found'} | "
+                        f"Direction={'✅' if direction_ok else '❌ wrong'}"
+                    )
 
                 if not sl_ok:
                     errors.append("verify_orders: SL order not found on exchange")

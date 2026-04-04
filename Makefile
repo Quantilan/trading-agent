@@ -57,6 +57,17 @@ status:
 build:
 	$(COMPOSE) build --no-cache
 
+## Print SSH tunnel command (run this on your LOCAL machine to access GUI on VPS)
+tunnel:
+	@VPS_IP=$$(curl -s --max-time 3 https://api.ipify.org 2>/dev/null || hostname -I | awk '{print $$1}'); \
+	echo ""; \
+	echo "  Run this on your LOCAL machine:"; \
+	echo ""; \
+	echo "    ssh -L 8080:localhost:8080 $$(whoami)@$$VPS_IP"; \
+	echo ""; \
+	echo "  Then open: http://localhost:8080"; \
+	echo ""
+
 ## Remove containers and image
 clean:
 	$(COMPOSE) down --rmi local

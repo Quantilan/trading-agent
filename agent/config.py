@@ -76,6 +76,10 @@ class AgentConfig:
     chart_tf:   str = "15m"  # timeframe for chart candles
     chart_bars: int = 50     # number of candles (25–100)
 
+    # Entry tolerance for deferred entries
+    entry_tolerance:        float = 0.1   # % tolerance for price matching (0.1 = 0.1%)
+    pending_entry_timeout:  int   = 24    # hours before pending entry is cancelled
+
     # Internal
     license_check_interval: int = 21600  # seconds (6 hours)
     reconnect_delay:        int = 5      # seconds between reconnects
@@ -117,7 +121,9 @@ def load_config() -> AgentConfig:
         llm_model               = os.getenv("LLM_MODEL", ""),
         chart_tf    = os.getenv("CHART_TF", "15m").strip(),
         chart_bars  = max(25, min(100, int(os.getenv("CHART_BARS", "50") or "50"))),
-        log_level           = os.getenv("LOG_LEVEL", "INFO").upper(),
+        log_level               = os.getenv("LOG_LEVEL", "INFO").upper(),
+        entry_tolerance         = float(os.getenv("ENTRY_TOLERANCE", "0.1")),
+        pending_entry_timeout   = int(os.getenv("PENDING_ENTRY_TIMEOUT", "24")),
     )
 
     _validate(cfg)

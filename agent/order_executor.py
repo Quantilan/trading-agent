@@ -24,6 +24,7 @@ import asyncio
 import json
 import logging
 import math
+import time
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -39,8 +40,12 @@ except ImportError:
 
 from .config import AgentConfig
 from .state import PositionSide, OrderParams
+from .coins import load_coins_list, build_registry, CoinInfo
 
 logger = logging.getLogger(__name__)
+
+_HL_MARKETS_CACHE = Path(__file__).parent.parent / ".cache" / "hl_markets.json"
+_HL_CACHE_TTL     = 3600  # seconds — refresh markets if older than this
 
 
 def _make_session() -> aiohttp.ClientSession:
@@ -126,6 +131,7 @@ class OrderExecutor:
         self._semaphore    = asyncio.Semaphore(3)
         self._markets      = {}
         self.is_one_way    = False  # set after connect()
+        self.coins: dict   = {}     # symbol → CoinInfo, populated in _init_coins()
 
     # ─────────────────────────────────────
     # CONNECT
@@ -138,12 +144,15 @@ class OrderExecutor:
         """
         try:
             self.exchange = self._create_exchange()
-            await self.exchange.load_markets()
+            await self._load_markets()
             self._markets = self.exchange.markets
             logger.info(f"✅ [Executor] Connected to {self.config.exchange.upper()}")
         except Exception as e:
             logger.error(f"❌ [Executor] Connection failed [{type(e).__name__}]: {e}")
             return False
+
+        # Validate coin list against exchange markets — always, regardless of mode
+        self._init_coins()
 
         if self.config.mode == 'paper':
             self.is_one_way = True
@@ -235,6 +244,75 @@ class OrderExecutor:
         except Exception as e:
             logger.error(f"[Executor] connect_pro failed: {e}")
             return False
+
+    async def _load_markets(self) -> None:
+        """
+        Load exchange markets. For Hyperliquid, use a disk cache to skip the
+        slow initial HTTP round-trip (~20 s) on subsequent connects.
+
+        Strategy:
+          - First connect (no cache): normal load_markets(), save result to disk.
+          - Subsequent connects (cache fresh < 1 h): restore markets from cache,
+            call load_markets(reload=False) which returns immediately since markets
+            are already set, then refresh cache in background.
+          - Cache stale (> 1 h): normal load_markets(), overwrite cache.
+        """
+        if self.config.exchange != 'hyperliquid':
+            await self.exchange.load_markets()
+            return
+
+        cached_markets, cache_age = self._read_hl_cache()
+
+        if cached_markets and cache_age < _HL_CACHE_TTL:
+            # Fast path — restore from disk, skip HTTP
+            self.exchange.markets = cached_markets
+            await self.exchange.load_markets(reload=False)
+            logger.info(
+                f"[Executor] HL markets loaded from cache "
+                f"(age {int(cache_age)}s, next refresh in {_HL_CACHE_TTL - int(cache_age)}s)"
+            )
+            # Refresh in background so cache stays warm
+            asyncio.create_task(self._refresh_hl_markets_bg())
+        else:
+            # Slow path — full fetch, then save to disk
+            t0 = time.monotonic()
+            await self.exchange.load_markets()
+            elapsed = time.monotonic() - t0
+            logger.info(f"[Executor] HL markets fetched in {elapsed:.1f}s — saving cache")
+            self._write_hl_cache(self.exchange.markets)
+
+    def _read_hl_cache(self):
+        """Return (markets_dict, age_seconds) or (None, inf) if cache missing/corrupt."""
+        try:
+            if not _HL_MARKETS_CACHE.exists():
+                return None, float('inf')
+            age = time.time() - _HL_MARKETS_CACHE.stat().st_mtime
+            data = json.loads(_HL_MARKETS_CACHE.read_text(encoding='utf-8'))
+            return data, age
+        except Exception as e:
+            logger.warning(f"[Executor] HL cache read error: {e}")
+            return None, float('inf')
+
+    def _write_hl_cache(self, markets: dict) -> None:
+        """Serialize exchange.markets to disk."""
+        try:
+            _HL_MARKETS_CACHE.parent.mkdir(parents=True, exist_ok=True)
+            _HL_MARKETS_CACHE.write_text(
+                json.dumps(markets, default=str),
+                encoding='utf-8',
+            )
+        except Exception as e:
+            logger.warning(f"[Executor] HL cache write error: {e}")
+
+    async def _refresh_hl_markets_bg(self) -> None:
+        """Background task: reload HL markets from API and update cache."""
+        try:
+            await self.exchange.load_markets(reload=True)
+            self._markets = self.exchange.markets
+            self._write_hl_cache(self.exchange.markets)
+            logger.debug("[Executor] HL markets cache refreshed in background")
+        except Exception as e:
+            logger.warning(f"[Executor] HL background markets refresh failed: {e}")
 
     def _create_exchange(self) -> ccxt.Exchange:
         """
@@ -566,16 +644,41 @@ class OrderExecutor:
             return []
 
     # ─────────────────────────────────────
+    # COINS INIT
+    # ─────────────────────────────────────
+
+    def _init_coins(self) -> None:
+        """
+        Load coins.json, validate against loaded exchange markets, cache CoinInfo.
+        Called automatically after load_markets() in connect().
+        """
+        try:
+            coin_list  = load_coins_list()
+            stbc       = self.config.stbc or "USDT"
+            self.coins = build_registry(coin_list, self._markets, stbc)
+        except Exception as e:
+            logger.warning(f"[Coins] _init_coins failed: {e}")
+            self.coins = {}
+
+    # ─────────────────────────────────────
     # MARKET PARAMS
     # ─────────────────────────────────────
 
-    def get_market_params(self, symbol: str) -> Tuple[int, float, float]:
+    def get_market_params(self, symbol: str) -> Tuple[int, float, float, float]:
         """
-        Returns (price_precision, amount_step, min_notional).
+        Returns (price_precision, amount_step, min_notional, max_amount).
 
         amount_step — minimum lot increment (e.g. 0.001 for ETH, 1.0 for TRX).
+        max_amount  — exchange hard limit on order size (0 = no limit).
         Use floor(amount / amount_step) * amount_step to avoid dust.
         """
+        # Use pre-validated coins registry if available
+        base = symbol.replace('USDT', '').replace('USDC', '').replace('/', '').strip().upper()
+        if base in self.coins:
+            c = self.coins[base]
+            return c.price_prec, c.amount_step, c.min_notional, c.max_amount
+
+        # Fallback: direct market lookup (for symbols not in coins.json)
         market    = self._markets.get(self._ms(symbol), {})
         precision = market.get('precision', {})
         limits    = market.get('limits', {})
@@ -588,8 +691,9 @@ class OrderExecutor:
 
         price_prec   = digits(precision.get('price'), 2)
         amount_step  = float(precision.get('amount') or 0.001)
-        min_notional = float(limits.get('cost', {}).get('min', 5.0) or 5.0)
-        return price_prec, amount_step, min_notional
+        min_notional = float((limits.get('cost') or {}).get('min') or 5.0)
+        max_amount   = float((limits.get('amount') or {}).get('max') or 0.0)
+        return price_prec, amount_step, min_notional, max_amount
 
     def _ms(self, symbol: str) -> str:
         """
@@ -715,6 +819,7 @@ class OrderExecutor:
 
             # 3. Take profit(s) — ladder or single (non-critical)
             take_ids = []
+            tp_errors = []
             if params.take_levels:
                 # TP ladder: multiple orders with split amounts
                 for tp_price, tp_amount in params.take_levels:
@@ -724,6 +829,7 @@ class OrderExecutor:
                         logger.info(f"✅ TP {params.symbol} @ {tp_price} | amt: {tp_amount}")
                     except Exception as e:
                         logger.warning(f"⚠️  TP {tp_price} failed {params.symbol}: {e}")
+                        tp_errors.append(f"TP@{tp_price}: {e}")
             elif params.take_price > 0:
                 # Single TP
                 try:
@@ -734,8 +840,11 @@ class OrderExecutor:
                     logger.info(f"✅ TP {params.symbol} @ {params.take_price}")
                 except Exception as e:
                     logger.warning(f"⚠️  TP failed {params.symbol}: {e}")
+                    tp_errors.append(f"TP@{params.take_price}: {e}")
 
-        return position_id, stop_id, take_ids, ""
+            tp_err_str = "; ".join(tp_errors) if tp_errors else ""
+
+        return position_id, stop_id, take_ids, tp_err_str
 
     # ─────────────────────────────────────
     # CLOSE POSITION
@@ -858,7 +967,7 @@ class OrderExecutor:
 
             if old_take_id and 'paper' not in str(old_take_id):
                 try:
-                    await self._cancel_stop(ms, old_take_id)
+                    await self._cancel_take(ms, old_take_id)
                 except Exception as e:
                     logger.warning(f"⚠️  cancel old take {symbol}: {e}")
 
@@ -1021,8 +1130,13 @@ class OrderExecutor:
         return order_id
 
     # ─────────────────────────────────────
-    # CANCEL STOP
+    # CANCEL STOP / TAKE
     # ─────────────────────────────────────
+
+    async def _cancel_take(self, ms: str, take_id: str) -> None:
+        """Cancel a take-profit order. Uses the same mechanism as _cancel_stop
+        since SL and TP are both algo/conditional orders on all supported exchanges."""
+        await self._cancel_stop(ms, take_id)
 
     async def _cancel_stop(self, ms: str, stop_id: str) -> None:
         ex = self.config.exchange

@@ -32,11 +32,12 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.types import BotCommand, MenuButtonCommands
 
 from .signal_parser import RegexParser
+from .coins import load_coins_list
 from .signal_parser.validator import (
     validate_open_sl, validate_open_tp,
     validate_modify_sl, validate_modify_tp,
 )
-from .state import Signal
+from .state import Signal, PositionSide
 
 if TYPE_CHECKING:
     from agent.main import TradingAgent
@@ -63,7 +64,7 @@ class PersonalBot:
         self.bot = Bot(token=token, session=_tg_session)
         self.dp  = Dispatcher()
 
-        self._regex_parser  = RegexParser()
+        self._regex_parser  = RegexParser(extra_symbols=load_coins_list())
         self._pending:    dict[str, Signal] = {}      # key → Signal awaiting confirmation
         self._pending_ts: dict[str, float]  = {}      # key → creation timestamp (TTL cleanup)
         self._cmd_last:   dict[str, float]  = {}      # cmd_name → last called timestamp
@@ -86,6 +87,7 @@ class PersonalBot:
         self.dp.message.register(self.cmd_autoconfirm,   Command("autoconfirm"))
         self.dp.message.register(self.cmd_mode,          Command("mode"))
         self.dp.message.register(self.cmd_clear_history, Command("clear_history"))
+        self.dp.message.register(self.cmd_pending,        Command("pending"))
 
         # Incoming text / forwarded messages → signal parser
         self.dp.message.register(
@@ -129,6 +131,7 @@ class PersonalBot:
             BotCommand(command="stop",        description="⏸ Pause trading"),
             BotCommand(command="resume",      description="▶️ Resume trading"),
             BotCommand(command="close_all",   description="❌ Close all positions"),
+            BotCommand(command="pending",        description="⏳ Pending (deferred) entries"),
             BotCommand(command="autoconfirm", description="⚡ Toggle auto-execute parsed signals"),
             BotCommand(command="mode",          description="🔄 Switch trading mode (paper / trade)"),
             BotCommand(command="clear_history", description="🗑 Clear trade history (monthly reset)"),
@@ -331,49 +334,113 @@ class PersonalBot:
         if not await self._check_cooldown(message, "positions"):
             return
 
-        mode       = self.agent.config.mode
-        positions  = self.agent.state.get_open_positions(mode=mode)
+        mode      = self.agent.config.mode
+        positions = self.agent.state.get_open_positions(mode=mode)
 
-        if not positions:
-            await message.answer("📊 No open positions.")
-            return
-
-        mode_badge = " 📋 PAPER" if mode == "paper" else " 💰 LIVE"
-        lines = [f"📊 <b>Open Positions{mode_badge}</b>\n"]
-        total_upnl = 0.0
-
+        # Fetch live prices and update unrealized_pnl on each position
         for p in positions:
-            # Fetch live price to calculate uPnL on the fly
             try:
-                current_price = await self.agent.executor.get_ticker(p.symbol)
+                price = await self.agent.executor.get_ticker(p.symbol)
             except Exception:
-                current_price = 0.0
-
-            if current_price > 0:
-                from .state import PositionSide
+                price = 0.0
+            if price > 0:
                 if p.side == PositionSide.LONG:
-                    upnl = (current_price - p.entry_price) * p.amount
+                    p.unrealized_pnl = round((price - p.entry_price) * p.amount, 2)
                 else:
-                    upnl = (p.entry_price - current_price) * p.amount
-                upnl = round(upnl, 2)
-                upnl_str = f"{'+'if upnl >= 0 else ''}{upnl:.2f}$ @ ${current_price:.4f}"
-            else:
-                upnl = p.unrealized_pnl or 0.0
-                upnl_str = f"{'+'if upnl >= 0 else ''}{upnl:.2f}$"
+                    p.unrealized_pnl = round((p.entry_price - price) * p.amount, 2)
 
-            total_upnl += upnl
+        # Start balance: first equity snapshot, or estimate from current balance minus rpnl
+        state       = self.agent.state
+        history     = state.equity_history
+        rpnl_total  = state.total_realized_pnl
+        if len(history) >= 1:
+            start_balance = history[0]
+        elif rpnl_total != 0:
+            start_balance = round(state.balance_total - rpnl_total, 2)
+        else:
+            start_balance = state.balance_total
 
-            sl_str = f"${p.stop_price:.4f}" if p.stop_price > 0 else "—"
-            tp_str = f"${p.take_price:.4f}" if p.take_price > 0 else "—"
-            lines.append(
-                f"<b>{p.symbol}</b>  {p.side.value.upper()}\n"
-                f"  Entry: ${p.entry_price:.4f}  |  Size: {p.amount}\n"
-                f"  SL: {sl_str}  |  TP: {tp_str}\n"
-                f"  uPnL: <b>{upnl_str}</b>\n"
+        from .pnl_image import generate_pnl_image
+        img_bytes = generate_pnl_image(
+            exchange      = self.agent.config.exchange,
+            mode          = mode,
+            leverage      = self.agent.config.leverage,
+            balance       = state.balance_total,
+            start_balance = start_balance,
+            equity_history= history,
+            positions     = positions,
+            stbc          = self.agent.config.stbc or "USDT",
+        )
+
+        mode_badge = "📋 PAPER" if mode == "paper" else "💰 LIVE"
+        n = len(positions)
+        caption = (
+            f"📊 <b>Positions — {mode_badge}</b>\n"
+            f"{n} open position{'s' if n != 1 else ''}"
+            if n > 0 else
+            f"📊 <b>Positions — {mode_badge}</b>\nNo open positions"
+        )
+
+        if img_bytes:
+            from aiogram.types import BufferedInputFile
+            await message.answer_photo(
+                BufferedInputFile(img_bytes, filename="positions.png"),
+                caption=caption,
+                parse_mode=ParseMode.HTML,
+            )
+        else:
+            # Fallback: plain text
+            if not positions:
+                await message.answer("📊 No open positions.")
+                return
+            lines = [f"📊 <b>Open Positions — {mode_badge}</b>\n"]
+            total_upnl = 0.0
+            for p in positions:
+                upnl = p.unrealized_pnl
+                total_upnl += upnl
+                sl_str = f"${p.stop_price:.4f}" if p.stop_price > 0 else "—"
+                tp_str = f"${p.take_price:.4f}" if p.take_price > 0 else "—"
+                lines.append(
+                    f"<b>{p.symbol}</b>  {p.side.value}\n"
+                    f"  Entry: ${p.entry_price:.4f}  |  Size: {p.amount}\n"
+                    f"  SL: {sl_str}  |  TP: {tp_str}\n"
+                    f"  uPnL: <b>{upnl:+.2f}$</b>\n"
+                )
+            lines.append(f"─────────────────\nTotal uPnL: <b>{total_upnl:+.2f}$</b>")
+            await message.answer("\n".join(lines), parse_mode=ParseMode.HTML)
+
+        # Remind about pending deferred entries if any
+        pending = self.agent.price_watcher.pending()
+        if pending:
+            syms = ", ".join(p.signal.symbol for p in pending)
+            await message.answer(
+                f"⏳ <b>{len(pending)} deferred entr{'y' if len(pending)==1 else 'ies'} waiting:</b> {syms}\n"
+                f"Use /pending for details.",
+                parse_mode=ParseMode.HTML,
             )
 
-        sign = "+" if total_upnl >= 0 else ""
-        lines.append(f"─────────────────\nTotal uPnL: <b>{sign}${total_upnl:.2f}</b>")
+    async def cmd_pending(self, message: types.Message):
+        if not await self._check_owner(message):
+            return
+
+        pending = self.agent.price_watcher.pending()
+        if not pending:
+            await message.answer("⏳ No pending deferred entries.")
+            return
+
+        tol = self.agent.config.entry_tolerance
+        lines = [f"⏳ <b>Pending entries ({len(pending)})</b>\n"]
+        for p in pending:
+            raw_min = p.raw_min
+            raw_max = p.raw_max
+            zone_str = f"{raw_min}" if raw_min == raw_max else f"{raw_min} – {raw_max}"
+            ttl_min = max(0, (p.expires_at - int(__import__('time').time())) // 60)
+            lines.append(
+                f"<b>{p.signal.symbol}</b>  {p.signal.action}\n"
+                f"  Zone: <b>{zone_str}</b>  (±{tol}%)\n"
+                f"  Expires in: {ttl_min} min\n"
+            )
+
         await message.answer("\n".join(lines), parse_mode=ParseMode.HTML)
 
     async def cmd_pnl(self, message: types.Message):

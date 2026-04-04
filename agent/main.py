@@ -28,6 +28,7 @@ from typing import Optional
 from .chart import draw_chart
 
 from .config import load_config, AgentConfig
+from .coins import load_coins_list, _COINS_FILE
 from .state import (
     StateManager, Signal,
     Position, PositionSide, PositionStatus
@@ -40,6 +41,7 @@ from .license import LicenseChecker, get_device_fingerprint
 from .daily_secret import DailySecretManager
 from .llm_parser import LLMParser
 from .position_monitor import PositionMonitor
+from .price_watcher import PriceWatcher
 
 
 from .logger import setup_logging as _setup_logging
@@ -60,14 +62,12 @@ class TradingAgent:
         self._closing_symbols: set = set()     # guard against double-close race condition
 
         # Modules
+        # State file is scoped by exchange + mode so paper/trade stats never mix.
+        # E.g.: state_binance_paper.json, state_hyperliquid_trade.json
         self.state    = StateManager(
             max_positions = config.max_positions,
-            state_file    = f"state_{config.exchange}.json",
+            state_file    = f"state_{config.exchange}_{config.mode}.json",
         )
-
-        # Restore mode persisted by /mode command (overrides .env)
-        if self.state.state.current_mode != config.mode:
-            config.mode = self.state.state.current_mode
 
         self.executor = OrderExecutor(config)
         self.risk     = RiskManager(config)
@@ -107,6 +107,15 @@ class TradingAgent:
             on_position_closed = self._on_position_closed_by_monitor,
         )
 
+        # Price watcher — deferred entries (WebSocket primary, REST fallback)
+        self.price_watcher = PriceWatcher(
+            get_ticker        = self.executor.get_ticker,
+            on_triggered      = self._on_deferred_entry_triggered,
+            get_pro_exchange  = lambda: getattr(self.executor, 'pro_exchange', None),
+            tolerance         = config.entry_tolerance / 100,
+            timeout_hours     = config.pending_entry_timeout,
+        )
+
     # ─────────────────────────────────────
     # START
     # ─────────────────────────────────────
@@ -137,9 +146,8 @@ class TradingAgent:
             logger.error("❌ Exchange connection failed. Agent stopped.")
             raise RuntimeError("Exchange connection failed")
 
-        # 2b. Connect ccxt.pro for paper mode WebSocket monitoring
-        if self.config.mode == "paper":
-            await self.executor.connect_pro()
+        # 2b. Connect ccxt.pro for WebSocket monitoring (paper: SL/TP candles, both modes: price watcher)
+        await self.executor.connect_pro()
 
         # 4. Get balance
         total, free, used = await self.executor.get_balance()
@@ -151,6 +159,7 @@ class TradingAgent:
 
         # 6. Start background tasks
         await self.monitor.start()
+        await self.price_watcher.start()
 
         tasks = [
             asyncio.create_task(self._process_signals(), name="signal_processor"),
@@ -231,7 +240,6 @@ class TradingAgent:
         event: 'open' | 'close' | 'modify_sl'
         For modify_sl: pos.stop_price must already contain the NEW stop.
         """
-        logger = logging.getLogger(__name__)
         logger = logging.getLogger(__name__)
 
         base = pos.symbol.upper()
@@ -385,12 +393,46 @@ class TradingAgent:
             logger.warning(f"[{signal.symbol}] Max positions reached ({self.config.max_positions})")
             return
 
+        # Deferred entry — register in PriceWatcher and wait for price zone
+        if signal.entry_type == "deferred" and signal.entry_min > 0:
+            self.price_watcher.register(signal)
+            raw_min = signal.entry_min
+            raw_max = signal.entry_max if signal.entry_max > signal.entry_min else raw_min
+            zone_str = f"{raw_min}" if raw_min == raw_max else f"{raw_min} – {raw_max}"
+            await self._notify(
+                f"⏳ <b>{signal.symbol} {signal.action}</b> — deferred entry\n"
+                f"Waiting for price zone: <b>{zone_str}</b>\n"
+                f"Tolerance: ±{self.config.entry_tolerance}%"
+            )
+            return
+
         # Get current balance
         total, free, used = await self.executor.get_balance()
         self.state.update_balance(total, free, used)
 
-        # Market params (precision, min_notional)
-        price_prec, amount_step, min_notional = self.executor.get_market_params(signal.symbol)
+        # Check if coin is known; if not — validate on exchange and optionally add to coins.json
+        base = signal.symbol.replace('USDT','').replace('USDC','').replace('/','').strip().upper()
+        if base not in self.executor.coins:
+            ms = self.executor._ms(signal.symbol)
+            if ms not in self.executor._markets:
+                logger.warning(f"[{signal.symbol}] Not found on {self.config.exchange.upper()} with {self.config.stbc} — skipping")
+                await self._notify(f"⚠️ <b>{base}</b> not available on {self.config.exchange.upper()} with {self.config.stbc}")
+                return
+            # Coin exists on exchange but not in coins.json → add it
+            try:
+                import json as _json
+                existing = load_coins_list()
+                if base not in existing:
+                    existing_sorted = sorted(set(existing + [base]))
+                    _COINS_FILE.write_text(_json.dumps(existing_sorted, indent=2, ensure_ascii=False), encoding="utf-8")
+                    logger.info(f"[Coins] Added {base} to coins.json")
+            except Exception as e:
+                logger.warning(f"[Coins] Could not update coins.json: {e}")
+            # Re-init coins registry so this symbol gets its params
+            self.executor._init_coins()
+
+        # Market params (precision, min_notional, exchange max_amount)
+        price_prec, amount_step, min_notional, max_amount = self.executor.get_market_params(signal.symbol)
 
         # Entry price: use signal.entry if set, otherwise fetch current market price
         entry_price = signal.entry
@@ -403,7 +445,7 @@ class TradingAgent:
         # Calculate position size
         params, err = self.risk.calculate(
             signal, free, entry_price,
-            price_prec, amount_step, min_notional
+            price_prec, amount_step, min_notional, max_amount
         )
         if err:
             logger.error(f"[{signal.symbol}] RiskManager error: {err}")
@@ -417,6 +459,14 @@ class TradingAgent:
         if err and not pos_id:
             logger.error(f"[{signal.symbol}] Open error: {err}")
             await self.notifier.on_error(f"Open {signal.symbol}: {err}")
+            return
+        if err and pos_id:
+            # Position opened but SL failed — executor already closed the position.
+            # Notify user and abort (do not save a position without a stop).
+            logger.critical(f"[{signal.symbol}] SL placement failed — position was auto-closed: {err}")
+            await self.notifier.on_error(
+                f"⚠️ {signal.symbol}: position opened but <b>SL failed</b> — position auto-closed.\n{err}"
+            )
             return
 
         # Save position to state
@@ -432,8 +482,9 @@ class TradingAgent:
             stop_price   = params.stop_price,
             take_price   = params.take_price,
             
-            take_levels    = signal.take_levels,      # Pass ladder prices
-            take_proportions = signal.take_proportions, # Pass exit weights
+            take_levels      = signal.take_levels,
+            take_proportions = signal.take_proportions,
+            take_amounts     = [a for _, a in params.take_levels] if params.take_levels else [],
 
             sl_pct       = params.sl_pct,
             tp_pct       = params.tp_pct,
@@ -451,6 +502,13 @@ class TradingAgent:
 
         logger.info(f"✅ [{signal.symbol}] Position opened {signal.action} @ {entry_price}")
         await self._notify_chart('open', position)
+
+        if err:
+            # TP placement failed — position and SL are live, but no take profit
+            logger.warning(f"[{signal.symbol}] TP placement error: {err}")
+            await self.notifier.on_error(
+                f"⚠️ {signal.symbol}: position opened, SL set, but <b>TP failed</b> — set manually.\n{err}"
+            )
 
     # ─────────────────────────────────────
     # EXIT POSITION (by signal)
@@ -506,6 +564,9 @@ class TradingAgent:
         if new_stop <= 0:
             return
 
+        price_prec, _, _, _ = self.executor.get_market_params(signal.symbol)
+        new_stop = round(new_stop, price_prec)
+
         new_stop_id, err = await self.executor.modify_stop(
             signal.symbol, position.stop_id,
             position.side, position.amount, new_stop
@@ -534,6 +595,27 @@ class TradingAgent:
         if new_tp <= 0:
             return
 
+        price_prec, _, _, _ = self.executor.get_market_params(signal.symbol)
+        new_tp = round(new_tp, price_prec)
+
+        old_tp = position.take_price
+
+        # If position has a TP ladder, cancel all existing levels first,
+        # then place a single new TP for the full remaining amount.
+        if position.take_ids:
+            ms = self.executor._ms(signal.symbol)
+            for tid in position.take_ids:
+                if tid and 'paper' not in str(tid):
+                    try:
+                        await self.executor._cancel_take(ms, tid)
+                    except Exception as e:
+                        logger.warning(f"[{signal.symbol}] cancel ladder TP {tid}: {e}")
+            position.take_levels.clear()
+            position.take_amounts.clear()
+            position.take_proportions.clear()
+            position.take_ids.clear()
+            position.take_id = ""
+
         new_take_id, err = await self.executor.modify_take(
             signal.symbol, position.take_id,
             position.side, position.amount, new_tp
@@ -542,15 +624,14 @@ class TradingAgent:
             await self.notifier.on_error(f"ModifyTP {signal.symbol}: {err}")
             return
 
-        old_tp = position.take_price
         position.take_price = new_tp
         if new_take_id:
             position.take_id = new_take_id
         self.state.set_position(position)
-        logger.info(f"🔄 [{signal.symbol}] TP moved ${old_tp:.4f} → ${new_tp:.4f}")
+        logger.info(f"🔄 [{signal.symbol}] TP moved {old_tp:.4f} → {new_tp:.4f}")
         await self._notify(
             f"🔄 <b>Take Profit Updated</b>\n"
-            f"{signal.symbol}: ${old_tp:.4f} → <b>${new_tp:.4f}</b>"
+            f"{signal.symbol}: {old_tp:.4f} → <b>{new_tp:.4f}</b>"
         )
 
     # ─────────────────────────────────────
@@ -566,6 +647,20 @@ class TradingAgent:
 
         position.rpnl     = round(rpnl_pct * position.volume, 2)
         position.rpnl_pct = round(rpnl_pct * 100, 2)
+
+    # ─────────────────────────────────────
+    # PRICE WATCHER CALLBACK
+    # ─────────────────────────────────────
+
+    async def _on_deferred_entry_triggered(self, signal: Signal) -> None:
+        """Called by PriceWatcher when price enters the entry zone."""
+        logger = logging.getLogger(__name__)
+        logger.info(f"[PriceWatcher] 🎯 {signal.symbol} entry triggered @ {signal.entry}")
+        await self._notify(
+            f"🎯 <b>{signal.symbol} {signal.action}</b> — entry zone reached\n"
+            f"Price: <b>{signal.entry}</b> — opening position"
+        )
+        await self._on_entry(signal)
 
     # ─────────────────────────────────────
     # MONITOR CALLBACK
@@ -584,12 +679,19 @@ class TradingAgent:
         """
         logger = logging.getLogger(__name__)
 
+        position = self.state.get_position(symbol)
+        if not position:
+            return
+
+        # ── Partial TP (ladder) ────────────────────────────────────────
+        if reason.startswith('tp_'):
+            await self._on_partial_tp(position, reason, close_price)
+            return
+
+        # ── Full close (sl / tp / manual) ─────────────────────────────
         # Guard: prevent double-close if signal exit fires simultaneously
         if symbol in self._closing_symbols:
             logger.debug(f"[{symbol}] Already closing — skipping monitor callback")
-            return
-        position = self.state.get_position(symbol)
-        if not position:
             return
 
         self._closing_symbols.add(symbol)
@@ -624,6 +726,114 @@ class TradingAgent:
             f"| rPnL: {position.rpnl:+.2f}$"
         )
         await self._notify_chart('close', position)
+
+    # ─────────────────────────────────────
+    # PARTIAL TP (ladder)
+    # ─────────────────────────────────────
+
+    async def _on_partial_tp(
+        self, position: Position, reason: str, close_price: float
+    ) -> None:
+        """
+        Handle one TP ladder level being hit.
+        Reduces position amount, removes the level from state, notifies.
+        If the last level is hit, fully closes the position.
+        """
+        logger = logging.getLogger(__name__)
+        symbol = position.symbol
+
+        try:
+            idx = int(reason[3:])
+        except (ValueError, IndexError):
+            logger.error(f"[{symbol}] Invalid partial TP reason: {reason}")
+            return
+
+        if idx >= len(position.take_levels):
+            logger.error(f"[{symbol}] Partial TP index {idx} out of range "
+                         f"(take_levels={position.take_levels})")
+            return
+
+        closed_amount = (
+            position.take_amounts[idx]
+            if idx < len(position.take_amounts)
+            else 0.0
+        )
+        if closed_amount <= 0:
+            logger.warning(f"[{symbol}] Partial TP_{idx}: zero amount, skipping")
+            return
+
+        total_levels  = len(position.take_levels)
+        level_number  = idx + 1   # human-readable: TP1, TP2, ...
+
+        # ── Calculate partial rPnL ────────────────────────────────────
+        partial_volume = (
+            position.volume * (closed_amount / position.amount)
+            if position.amount > 0 else 0.0
+        )
+        if position.side == PositionSide.LONG:
+            rpnl_pct = (close_price - position.entry_price) / position.entry_price
+        else:
+            rpnl_pct = (position.entry_price - close_price) / position.entry_price
+        partial_rpnl     = round(rpnl_pct * partial_volume, 2)
+        partial_rpnl_pct = round(rpnl_pct * 100, 2)
+
+        # ── Update position state ─────────────────────────────────────
+        position.take_levels.pop(0)
+        if position.take_amounts:    position.take_amounts.pop(0)
+        if position.take_ids:        position.take_ids.pop(0)
+        if position.take_proportions: position.take_proportions.pop(0)
+
+        position.amount = round(position.amount - closed_amount, 8)
+        position.volume = round(position.volume - partial_volume, 2)
+        position.margin = (
+            round(position.volume / position.leverage, 2)
+            if position.leverage > 0 else position.margin
+        )
+        position.rpnl = round(position.rpnl + partial_rpnl, 2)   # accumulate
+        position.take_price = position.take_levels[0] if position.take_levels else 0.0
+
+        level_label = f"TP{level_number}/{total_levels}"
+        logger.info(
+            f"🟡 [{symbol}] {level_label} hit @ {close_price} "
+            f"| partial rPnL: {partial_rpnl:+.2f}$ ({partial_rpnl_pct:+.2f}%)"
+        )
+
+        # ── Last level → fully close ──────────────────────────────────
+        if not position.take_levels:
+            position.close_price     = close_price
+            position.close_timestamp = int(time.time() * 1000)
+            position.status          = PositionStatus.CLOSED_TP
+            # rpnl already accumulated; set rpnl_pct relative to total original margin
+            if position.mode == "trade":
+                await self.executor.close_position(
+                    symbol, position.amount, position.side, close_price
+                )
+            self.state.remove_position(symbol)
+            logger.info(
+                f"🟢 [{symbol}] Last TP level — position fully closed "
+                f"| total rPnL: {position.rpnl:+.2f}$"
+            )
+            await self._notify_chart('close', position)
+            return
+
+        # ── Partial: keep position open ───────────────────────────────
+        self.state.set_position(position)
+
+        # Notify partial hit
+        base = symbol.upper()
+        for s in ('USDT', 'USDC', 'BUSD'):
+            if base.endswith(s):
+                base = base[:-len(s)]
+                break
+        emoji = "✅" if partial_rpnl >= 0 else "🟡"
+        text = (
+            f"{emoji} <b>{position.side.value} {base} — {level_label}</b>\n"
+            f"@ {close_price}\n"
+            f"rPnL: <b>{partial_rpnl:+.2f}$ ({partial_rpnl_pct:+.2f}%)</b>\n"
+            f"Remaining: {position.amount:.4f} "
+            f"({len(position.take_levels)} level{'s' if len(position.take_levels) != 1 else ''} left)"
+        )
+        await self._notify(text)
 
     # ─────────────────────────────────────
     # PNL UPDATER (background cache)

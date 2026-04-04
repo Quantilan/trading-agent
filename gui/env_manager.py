@@ -45,6 +45,8 @@ ENV_DEFAULTS: Dict[str, str] = {
     "LOG_LEVEL":              "INFO",  # kept for agent runtime, not shown in UI
     "CHART_TF":               "15m",
     "CHART_BARS":             "50",
+    "ENTRY_TOLERANCE":        "0.1",  # % tolerance for deferred entry price zone
+    "PENDING_ENTRY_TIMEOUT":  "24",   # hours before pending entry is cancelled
 }
 
 
@@ -214,6 +216,13 @@ def write_env(data: Dict[str, str]) -> None:
     else:
         lines.append("# LLM_MODEL=  # auto")
 
-    lines.append("")
+    lines += [
+        "",
+        "# ─── Logging & chart ──────────────────────────────────────",
+        f"LOG_LEVEL={values['LOG_LEVEL']}",
+        f"CHART_TF={values['CHART_TF']}",
+        f"CHART_BARS={values['CHART_BARS']}",
+        "",
+    ]
 
     ENV_FILE.write_text("\n".join(lines), encoding="utf-8")
