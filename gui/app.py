@@ -305,6 +305,15 @@ async def test_connection(req: TestConnectionRequest):
         if mode == "paper":
             # Return paper balance; no authenticated balance call needed
             paper_bal = config.paper_balance
+            coins_data = {
+                sym: {
+                    "available":    c.available,
+                    "min_notional": c.min_notional,
+                    "amount_step":  c.amount_step,
+                    "max_amount":   c.max_amount,
+                }
+                for sym, c in executor.coins.items()
+            } if executor.coins else {}
             await executor.disconnect()
             return {
                 "ok":       True,
@@ -312,6 +321,7 @@ async def test_connection(req: TestConnectionRequest):
                 "balance":  {"total": paper_bal, "free": paper_bal, "used": 0.0},
                 "stbc":     stbc,
                 "pos_mode": "paper",
+                "coins":    coins_data,
             }
 
         total, free, used = await executor.get_balance()

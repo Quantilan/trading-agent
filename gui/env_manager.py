@@ -146,11 +146,14 @@ def write_env(data: Dict[str, str]) -> None:
     Write config dict to .env, preserving structure of .env.example.
     Unknown keys from data are appended at the end.
     """
-    # Build key→value from submitted data, falling back to defaults
+    # Build key→value from submitted data, falling back to defaults.
+    # If a submitted value is empty but the default is non-empty, keep the default
+    # (prevents hidden/non-form fields like LOG_LEVEL from being wiped to "").
     values = dict(ENV_DEFAULTS)
     for k, v in data.items():
         if k in values:
-            values[k] = v.strip() if v else ""
+            stripped = v.strip() if v else ""
+            values[k] = stripped if stripped else ENV_DEFAULTS.get(k, "")
 
     lines = [
         "# ─────────────────────────────────────────────────────────",
@@ -217,6 +220,10 @@ def write_env(data: Dict[str, str]) -> None:
         lines.append("# LLM_MODEL=  # auto")
 
     lines += [
+        "",
+        "# ─── Entry zone (deferred entries) ───────────────────────",
+        f"ENTRY_TOLERANCE={values['ENTRY_TOLERANCE']}",
+        f"PENDING_ENTRY_TIMEOUT={values['PENDING_ENTRY_TIMEOUT']}",
         "",
         "# ─── Logging & chart ──────────────────────────────────────",
         f"LOG_LEVEL={values['LOG_LEVEL']}",
