@@ -589,18 +589,18 @@ class PositionMonitor:
         if not self.trailing_stop:
             return False
 
-        # Determine original SL % from entry
-        sl_pct = position.sl_pct
+        # Determine original SL distance as fraction of entry price (e.g. 0.02 = 2%)
+        sl_pct = position.sl_pct  # stored as fraction: 0.02 means 2%
         if sl_pct <= 0 and position.stop_price > 0 and position.entry_price > 0:
-            sl_pct = abs(position.entry_price - position.stop_price) / position.entry_price * 100
+            sl_pct = abs(position.entry_price - position.stop_price) / position.entry_price
         if sl_pct <= 0:
             return False
 
-        # Unrealized PnL % relative to entry price
+        # Unrealized PnL as fraction of entry price (e.g. 0.03 = 3%)
         if position.side == PositionSide.LONG:
-            upnl_pct = (close_price - position.entry_price) / position.entry_price * 100
+            upnl_pct = (close_price - position.entry_price) / position.entry_price
         else:
-            upnl_pct = (position.entry_price - close_price) / position.entry_price * 100
+            upnl_pct = (position.entry_price - close_price) / position.entry_price
 
         if upnl_pct <= 0:
             return False   # Position underwater — don't trail
@@ -609,12 +609,12 @@ class PositionMonitor:
         #   Phase 1 (any profit):     trail at original sl_pct — follow price, protect gains
         #   Phase 2 (profit ≥ 1.5×): tighten to 0.618 × sl_pct — lock in more
         if upnl_pct >= _TRAIL_TRIGGER * sl_pct:
-            trail_pct = _TRAIL_DISTANCE * sl_pct   # e.g. 2% → 1.236%
+            trail_pct = _TRAIL_DISTANCE * sl_pct   # e.g. 0.02 → 0.01236
         else:
             trail_pct = sl_pct                      # regular distance
 
         price_prec, _, _, _ = self.executor.get_market_params(position.symbol)
-        trail_dist = trail_pct / 100
+        trail_dist = trail_pct  # already a fraction — do NOT divide by 100 again
 
         if position.side == PositionSide.LONG:
             new_sl = round(close_price * (1.0 - trail_dist), price_prec)
@@ -631,7 +631,7 @@ class PositionMonitor:
 
         logger.info(
             f"[{position.symbol}] 🔒 Trailing stop: {position.stop_price} → {new_sl} "
-            f"(upnl {upnl_pct:.2f}%, dist {trail_pct:.3f}%"
+            f"(upnl {upnl_pct*100:.2f}%, dist {trail_pct*100:.3f}%"
             + (" [tightened]" if upnl_pct >= _TRAIL_TRIGGER * sl_pct else "") + ")"
         )
 
