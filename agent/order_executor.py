@@ -618,6 +618,10 @@ class OrderExecutor:
                 return 0.0, 0.0, 0.0
 
     async def get_ticker(self, symbol: str) -> float:
+        # Hyperliquid fast path: allMids endpoint returns all mid prices in <500ms.
+        # fetch_ticker on HL calls metaAndAssetCtxs (~50KB, 5-15s) — far too slow.
+        if self.config.exchange == 'hyperliquid':
+            return await self._get_ticker_hl(symbol)
         try:
             ticker = await self.exchange.fetch_ticker(self._ms(symbol))
             price  = float(ticker.get('last', 0) or ticker.get('close', 0) or 0)
@@ -630,6 +634,40 @@ class OrderExecutor:
             if cached > 0:
                 logger.info(f"[Executor] get_ticker {symbol}: using cached price {cached}")
             return cached
+
+    async def _get_ticker_hl(self, symbol: str) -> float:
+        """
+        Hyperliquid-specific price fetch via allMids endpoint.
+        Returns mid price for symbol (e.g. 'BTC' or 'BTC/USDC:USDC').
+        Falls back to fetch_ticker if allMids fails.
+        """
+        base = symbol.split('/')[0].upper()
+        try:
+            resp = await self._session.post(
+                'https://api.hyperliquid.xyz/info',
+                json={'type': 'allMids'},
+                timeout=aiohttp.ClientTimeout(total=5),
+            )
+            data = await resp.json()
+            # data is dict: {"BTC": "83200.5", "ETH": "2050.1", ...}
+            raw = data.get(base)
+            if raw:
+                price = float(raw)
+                if price > 0:
+                    self._price_cache[symbol] = price
+                return price
+        except Exception as e:
+            logger.warning(f"[Executor] HL allMids failed for {symbol}: {e}")
+        # Fallback to standard fetch_ticker
+        try:
+            ticker = await self.exchange.fetch_ticker(self._ms(symbol))
+            price  = float(ticker.get('last', 0) or ticker.get('close', 0) or 0)
+            if price > 0:
+                self._price_cache[symbol] = price
+            return price
+        except Exception as e:
+            logger.error(f"❌ [Executor] get_ticker HL {symbol}: {e}")
+            return self._price_cache.get(symbol, 0.0)
 
     async def fetch_ohlcv(self, symbol: str, tf: str = '15m', limit: int = 50) -> list:
         """
