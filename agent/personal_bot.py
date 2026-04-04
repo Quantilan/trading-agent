@@ -673,12 +673,13 @@ class PersonalBot:
                 logger.info(f"[PersonalBot] Fetching current price for {signal.symbol}")
                 current_price = await asyncio.wait_for(
                     self.agent.executor.get_ticker(signal.symbol),
-                    timeout=5.0,
+                    timeout=10.0,
                 )
-            except Exception:
-                pass
-            finally:
                 logger.info(f"[PersonalBot] Current price for {signal.symbol}: {current_price}")
+            except asyncio.TimeoutError:
+                logger.warning(f"[PersonalBot] Price fetch timeout for {signal.symbol} — proceeding without price")
+            except Exception as e:
+                logger.warning(f"[PersonalBot] Price fetch failed for {signal.symbol}: {e}")
                 
         # Validate
         error = self._validate_signal(signal, current_price)
