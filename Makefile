@@ -7,7 +7,8 @@
 #  make restart   — restart agent (picks up .env changes)
 #  make logs      — tail agent logs
 #  make status    — show running containers
-#  make build     — rebuild Docker image
+#  make build     — rebuild Docker image (with cache, fast)
+#  make rebuild   — rebuild from scratch (after requirements.txt changes)
 #  make clean     — remove containers and image
 
 COMPOSE = docker compose
@@ -53,8 +54,12 @@ logs:
 status:
 	$(COMPOSE) ps
 
-## Rebuild image (after code changes)
+## Rebuild image using cache (fast, for routine updates)
 build:
+	$(COMPOSE) build
+
+## Rebuild image from scratch, no cache (use after requirements.txt changes)
+rebuild:
 	$(COMPOSE) build --no-cache
 
 ## Print SSH tunnel command (run this on your LOCAL machine to access GUI on VPS)

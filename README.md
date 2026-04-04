@@ -238,7 +238,8 @@ make stop       # stop agent
 make restart    # restart agent (reloads .env)
 make logs       # tail live logs
 make status     # show container status
-make build      # rebuild image after code changes
+make build      # rebuild image with cache (fast, for code updates)
+make rebuild    # rebuild from scratch (use after requirements.txt changes)
 make clean      # remove containers and image
 ```
 
