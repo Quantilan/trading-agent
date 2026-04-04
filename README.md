@@ -29,7 +29,7 @@
 git clone https://github.com/Quantilan/trading-agent.git
 cd trading-agent
 make setup   # create .env and state files
-make gui     # start Setup GUI
+make gui     # start Setup GUI — configure and launch agent from browser
 ```
 
 Open **http://localhost:8080** — configure, test connections, start the agent. That's it.
@@ -129,12 +129,14 @@ http://localhost:8080
 
 Fill in exchange credentials, Telegram bot, signal source — then click **Start Agent**.
 
-**Step 4 — run agent in background:**
+The agent starts immediately in the background. You can close the browser and the GUI — the agent keeps running.
+
+**Optional — manage from terminal:**
 
 ```bash
-# on the server
-make start
 make logs     # watch live output
+make stop     # stop agent
+make restart  # restart after .env change
 ```
 
 ---
