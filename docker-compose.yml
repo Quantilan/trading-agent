@@ -12,7 +12,7 @@ services:
       - "127.0.0.1:8080:8080"
     volumes:
       - ./.env:/app/.env
-      - ./logs:/app/logs:ro
+      - ./logs:/app/logs
       - ./agent_state.json:/app/agent_state.json:ro
     restart: "no"
 
