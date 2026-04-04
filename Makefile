@@ -18,6 +18,10 @@ COMPOSE = $(shell docker info >/dev/null 2>&1 && echo "docker compose" || echo "
 
 ## First-time setup: create .env and state file if missing
 setup:
+	@if [ -d .env ]; then \
+		echo "⚠️  .env is a directory (Docker artifact) — removing and recreating as file..."; \
+		rm -rf .env; \
+	fi
 	@if [ ! -f .env ]; then \
 		cp .env.example .env; \
 		echo "✅ .env created from .env.example — edit it or use 'make gui'"; \
@@ -79,8 +83,14 @@ clean:
 	$(COMPOSE) down --rmi local
 	@echo "🗑  Containers and image removed."
 
-## Internal: warn if .env missing
+## Internal: ensure .env is a file (not a dir) and exists
 _ensure_env:
+	@if [ -d .env ]; then \
+		echo "⚠️  .env is a directory (Docker artifact) — fixing..."; \
+		rm -rf .env; \
+		cp .env.example .env; \
+		echo "✅ .env re-created from .env.example — configure it via 'make gui'"; \
+	fi
 	@if [ ! -f .env ]; then \
 		echo "❌ .env not found. Run 'make setup' first."; \
 		exit 1; \
