@@ -116,9 +116,9 @@ def generate_pnl_image(
             f"Mode: {mode}  |  Leverage: x{leverage}",
             color=GRAY, fontsize=12, va="top")
     ax.text(40, 165,
-            f"Start: {start_balance:.2f}$ "
+            f"Start: {start_balance:.2f}\\$ "
             f" |  Max Drawdown: -{max_dd:.2f}%"
-            f"  |  Margin used: {total_margin:.1f}$",
+            f"  |  Margin used: {total_margin:.1f}\\$",
             color=GRAY, fontsize=11, va="top")
 
     # ── Column header row ─────────────────────────────────────────
@@ -151,9 +151,9 @@ def generate_pnl_image(
                     color=WHITE,      fontsize=14, va="top", fontweight="bold",    zorder=2)
             ax.text(COLS["side"],   y + 11, row["side"],
                     color=side_color, fontsize=14, va="top", fontweight="bold",    zorder=2)
-            ax.text(COLS["margin"], y + 11, f"{row['margin']:.1f}$",
+            ax.text(COLS["margin"], y + 11, f"{row['margin']:.1f}\\$",
                     color=WHITE,      fontsize=14, va="top",                       zorder=2)
-            ax.text(COLS["upnl"],   y + 11, f"{row['upnl']:+.2f}$",
+            ax.text(COLS["upnl"],   y + 11, f"{row['upnl']:+.2f}\\$",
                     color=upnl_color, fontsize=14, va="top", fontweight="bold",    zorder=2)
             ax.text(COLS["roe"],    y + 14, f"({row['roe']:+.1f}%)",
                     color=GRAY,       fontsize=11, va="top",                       zorder=2)
@@ -165,7 +165,7 @@ def generate_pnl_image(
     y += 18
     upnl_color = GREEN if total_upnl >= 0 else RED
     ax.text(40, y,
-            f"TOTAL uPnL: {total_upnl:+.1f}$  ({total_upnl_pct:+.2f}%)",
+            f"TOTAL uPnL: {total_upnl:+.1f}\\$  ({total_upnl_pct:+.2f}%)",
             color=upnl_color, fontsize=13, va="top", fontweight="bold", zorder=2)
     now_str = datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M UTC")
     ax.text(IMG_W - 40, y + 4, now_str,

@@ -700,7 +700,7 @@ class PersonalBot:
         mode = self.agent.config.parser_mode
         if mode == "llm" and self.agent.llm_parser:
             return await self.agent.llm_parser.parse(text)
-        return self._regex_parser.parse(text, self.agent.config.default_sl_pct)
+        return self._regex_parser.parse(text, self.agent.config.default_sl_pct, self.agent.config.default_tp_pct)
 
     def _validate_signal(self, signal: Signal, price: Optional[float]) -> str:
         action = signal.action

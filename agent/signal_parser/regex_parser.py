@@ -68,7 +68,7 @@ class RegexParser:
     # PUBLIC
     # ─────────────────────────────────────────
 
-    def parse(self, text: str, default_sl_pct: float = 2.0) -> Optional[Signal]:
+    def parse(self, text: str, default_sl_pct: float = 2.0, default_tp_pct: float = 0.0) -> Optional[Signal]:
         # 1. Basic cleanup
         t = text.lower().strip()
 
@@ -131,9 +131,9 @@ class RegexParser:
             sl_pct           = sl_pct if sl_pct > 0 else (default_sl_pct / 100 if final_stop == 0 else 0.0),
             stop_price       = final_stop,
             take_price       = final_take,
+            tp_pct           = tp_pct if tp_pct > 0 else (default_tp_pct / 100 if final_take == 0 and not isinstance(tp_abs, list) else 0.0),
             take_levels      = tp_abs if isinstance(tp_abs, list) else [],
             take_proportions = proportions,
-            tp_pct           = tp_pct,
             new_sl           = final_stop if sig_action == "MODIFY_SL" else 0.0,
             new_tp           = final_take if sig_action == "MODIFY_TP" else 0.0,
             reason           = "telegram_text",
