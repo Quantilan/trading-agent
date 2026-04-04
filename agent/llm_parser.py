@@ -5,6 +5,8 @@ LLM-based signal parser for Telegram channel messages.
 Supported providers:
   none   — disabled (no parsing)
   claude — Anthropic Claude (claude-haiku-4-5-20251001 by default)
+  groq   — Groq API — free tier, fast Llama inference (llama-3.3-70b-versatile by default)
+           Sign up at https://console.groq.com — free API key, no credit card required.
 
 The LLM receives raw message text and returns a structured Signal or None.
 """
@@ -21,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_MODEL = {
     "claude": "claude-haiku-4-5-20251001",
+    "groq":   "llama-3.3-70b-versatile",
 }
 
 _SYSTEM_PROMPT = """\
@@ -66,31 +69,14 @@ class LLMParser:
         if self.provider == "claude":
             return await self._parse_claude(text)
 
+        if self.provider == "groq":
+            return await self._parse_groq(text)
+
         logger.warning(f"[LLMParser] Unknown provider: {self.provider}")
         return None
 
-    async def _parse_claude(self, text: str) -> Optional[Signal]:
-        try:
-            import anthropic
-            client = anthropic.AsyncAnthropic(api_key=self.api_key)
-
-            response = await client.messages.create(
-                model=self.model,
-                max_tokens=256,
-                system=_SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": text}],
-            )
-
-            raw = response.content[0].text.strip()
-            data = json.loads(raw)
-
-        except json.JSONDecodeError as e:
-            logger.warning(f"[LLMParser] JSON parse error: {e} | raw: {raw[:100]}")
-            return None
-        except Exception as e:
-            logger.error(f"[LLMParser] Claude API error: {e}")
-            return None
-
+    def _signal_from_dict(self, data: dict, text: str) -> Optional[Signal]:
+        """Convert parsed LLM JSON dict into a Signal. Shared by all providers."""
         if not data.get("action"):
             return None
 
@@ -107,13 +93,12 @@ class LLMParser:
         if action not in ("LONG", "SHORT", "FLAT"):
             return None
 
-        entry_price  = float(data["entry_price"]) if data.get("entry_price") else 0.0
-        stop_price   = float(data["stop_price"])  if data.get("stop_price")  else 0.0
-        take_price   = float(data["take_price"])  if data.get("take_price")  else 0.0
-        entry_type   = data.get("entry_type", "market")
-        take_levels  = [float(p) for p in data.get("take_levels", []) if p]
+        entry_price = float(data["entry_price"]) if data.get("entry_price") else 0.0
+        stop_price  = float(data["stop_price"])  if data.get("stop_price")  else 0.0
+        take_price  = float(data["take_price"])  if data.get("take_price")  else 0.0
+        entry_type  = data.get("entry_type", "market")
+        take_levels = [float(p) for p in data.get("take_levels", []) if p]
 
-        # If multiple levels, take_price = first level
         if take_levels and not take_price:
             take_price = take_levels[0]
 
@@ -136,3 +121,61 @@ class LLMParser:
             f"entry={entry_price} SL={stop_price} {tp_info} conf={confidence:.2f}"
         )
         return signal
+
+    async def _parse_claude(self, text: str) -> Optional[Signal]:
+        raw = ""
+        try:
+            import anthropic
+            client = anthropic.AsyncAnthropic(api_key=self.api_key)
+
+            response = await client.messages.create(
+                model=self.model,
+                max_tokens=256,
+                system=_SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": text}],
+            )
+
+            raw = response.content[0].text.strip()
+            data = json.loads(raw)
+
+        except json.JSONDecodeError as e:
+            logger.warning(f"[LLMParser] JSON parse error: {e} | raw: {raw[:100]}")
+            return None
+        except Exception as e:
+            logger.error(f"[LLMParser] Claude API error: {e}")
+            return None
+
+        return self._signal_from_dict(data, text)
+
+    async def _parse_groq(self, text: str) -> Optional[Signal]:
+        raw = ""
+        try:
+            from groq import AsyncGroq
+            client = AsyncGroq(api_key=self.api_key)
+
+            response = await client.chat.completions.create(
+                model=self.model,
+                max_tokens=256,
+                messages=[
+                    {"role": "system", "content": _SYSTEM_PROMPT},
+                    {"role": "user",   "content": text},
+                ],
+            )
+
+            raw = response.choices[0].message.content.strip()
+            # Strip markdown code fences if model wraps JSON in ```
+            if raw.startswith("```"):
+                raw = raw.split("```")[1]
+                if raw.startswith("json"):
+                    raw = raw[4:]
+                raw = raw.strip()
+            data = json.loads(raw)
+
+        except json.JSONDecodeError as e:
+            logger.warning(f"[LLMParser] JSON parse error: {e} | raw: {raw[:100]}")
+            return None
+        except Exception as e:
+            logger.error(f"[LLMParser] Groq API error: {e}")
+            return None
+
+        return self._signal_from_dict(data, text)

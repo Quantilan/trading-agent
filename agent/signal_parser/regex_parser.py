@@ -238,8 +238,8 @@ class RegexParser:
         """
         Extracts Take Profit. Returns (pct, [abs_prices]).
         """
-        # Key change: Included '-' in the keyword part to handle 'тейк-профіт'
-        pattern = r"(?i)(?:тейк[-а-яіi]*|take[- ]?profit|tp)[:\s-]*([\d\s,.\bи\band&%]+)"
+        # [^0-9%\n]* skips any prefix words (e.g. "на", coin symbol) before the first digit
+        pattern = r"(?i)(?:тейк[-а-яіi]*|take[- ]?profit|tp)[^0-9%\n]*([\d\s,.\bи\band&%]+)"
         match = re.search(pattern, text)
         
         if not match:

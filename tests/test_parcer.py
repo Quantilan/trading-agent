@@ -1,5 +1,8 @@
+import json
 import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
 from agent.signal_parser.regex_parser import RegexParser
+from agent.llm_parser import LLMParser
 
 @pytest.fixture
 def parser():
@@ -138,6 +141,207 @@ def test_sl_shorthand_space_no_colon(parser):
     assert signal is not None
     assert signal.sl_pct == pytest.approx(0.015)
     assert signal.tp_pct == pytest.approx(0.05)
+
+
+# ── Additional regex tests ────────────────────────────────────────────────────
+
+def test_flat_close_signal(parser):
+    """'close btc' produces a FLAT signal."""
+    signal = parser.parse("close btc")
+    assert signal is not None
+    assert signal.action == "FLAT"
+    assert signal.symbol == "BTC"
+
+
+def test_modify_tp_parsing(parser):
+    """MODIFY_TP correctly maps price to take_price."""
+    signal = parser.parse("тейк на ETH 2100")
+    assert signal is not None
+    assert signal.action == "MODIFY_TP"
+    assert signal.symbol == "ETH"
+    assert signal.take_price == pytest.approx(2100.0)
+
+
+def test_hashtag_symbol(parser):
+    """Symbol with # prefix is parsed correctly."""
+    signal = parser.parse("🔥 SHORT #DOGE стоп 0.16")
+    assert signal is not None
+    assert signal.symbol == "DOGE"
+    assert signal.action == "SHORT"
+    assert signal.stop_price == pytest.approx(0.16)
+
+
+def test_ukrainian_long_signal(parser):
+    """Full Ukrainian-language LONG signal parses correctly."""
+    text = "відкривай лонг #SOL\nвхід по ринку\nстоп на 145"
+    signal = parser.parse(text)
+    assert signal is not None
+    assert signal.symbol == "SOL"
+    assert signal.action == "LONG"
+    assert signal.stop_price == pytest.approx(145.0)
+
+
+def test_cyrillic_alias_bitcoin(parser):
+    """'биток' alias resolves to BTC."""
+    signal = parser.parse("лонг биток стоп 60000")
+    assert signal is not None
+    assert signal.symbol == "BTC"
+
+
+def test_tp_only_no_sl(parser):
+    """TP present but no SL — stop_price stays 0."""
+    signal = parser.parse("long ETH тейк 2500")
+    assert signal is not None
+    assert signal.take_price == pytest.approx(2500.0)
+    assert signal.stop_price == 0.0
+
+
+def test_non_signal_returns_none(parser):
+    """Random non-trading text returns None."""
+    signal = parser.parse("Привет всем! Как дела?")
+    assert signal is None
+
+
+def test_short_signal_english(parser):
+    """Plain English short signal."""
+    signal = parser.parse("sell BNB stop-loss 550")
+    assert signal is not None
+    assert signal.action == "SHORT"
+    assert signal.symbol == "BNB"
+    assert signal.stop_price == pytest.approx(550.0)
+
+
+def test_sl_tp_pct_only_sl(parser):
+    """Only SL% shorthand, no TP%."""
+    signal = parser.parse("long link sl: 2%")
+    assert signal is not None
+    assert signal.symbol == "LINK"
+    assert signal.sl_pct == pytest.approx(0.02)
+    assert signal.tp_pct == 0.0
+
+
+# ── LLM parser tests (mocked, no real API calls) ─────────────────────────────
+
+_SAMPLE_JSON = {
+    "action":      "LONG",
+    "symbol":      "ETH",
+    "entry_type":  "market",
+    "entry_price": 3200.0,
+    "stop_price":  3100.0,
+    "take_price":  3400.0,
+    "take_levels": [3400.0, 3600.0],
+    "confidence":  0.92,
+}
+
+
+def _make_claude_response(payload: dict) -> MagicMock:
+    resp = MagicMock()
+    resp.content = [MagicMock(text=json.dumps(payload))]
+    return resp
+
+
+def _make_groq_response(payload: dict) -> MagicMock:
+    resp = MagicMock()
+    resp.choices = [MagicMock(message=MagicMock(content=json.dumps(payload)))]
+    return resp
+
+
+@pytest.mark.asyncio
+async def test_llm_claude_parses_long():
+    """LLMParser with claude provider returns correct Signal from mocked response."""
+    parser = LLMParser(provider="claude", api_key="fake-key")
+    with patch("anthropic.AsyncAnthropic") as MockClient:
+        instance = MockClient.return_value
+        instance.messages.create = AsyncMock(return_value=_make_claude_response(_SAMPLE_JSON))
+        signal = await parser.parse("buy eth long, entry 3200, sl 3100, tp 3400/3600")
+
+    assert signal is not None
+    assert signal.symbol == "ETH"
+    assert signal.action == "LONG"
+    assert signal.entry == pytest.approx(3200.0)
+    assert signal.stop_price == pytest.approx(3100.0)
+    assert signal.take_levels == [3400.0, 3600.0]
+
+
+@pytest.mark.asyncio
+async def test_llm_groq_parses_long():
+    """LLMParser with groq provider returns correct Signal from mocked response."""
+    parser = LLMParser(provider="groq", api_key="fake-key")
+    with patch("groq.AsyncGroq") as MockClient:
+        instance = MockClient.return_value
+        instance.chat.completions.create = AsyncMock(
+            return_value=_make_groq_response(_SAMPLE_JSON)
+        )
+        signal = await parser.parse("buy eth long, entry 3200, sl 3100, tp 3400")
+
+    assert signal is not None
+    assert signal.symbol == "ETH"
+    assert signal.action == "LONG"
+    assert signal.stop_price == pytest.approx(3100.0)
+
+
+@pytest.mark.asyncio
+async def test_llm_low_confidence_returns_none():
+    """Signal with confidence < 0.65 is discarded."""
+    parser = LLMParser(provider="claude", api_key="fake-key")
+    payload = {**_SAMPLE_JSON, "confidence": 0.4}
+    with patch("anthropic.AsyncAnthropic") as MockClient:
+        instance = MockClient.return_value
+        instance.messages.create = AsyncMock(return_value=_make_claude_response(payload))
+        signal = await parser.parse("some text")
+
+    assert signal is None
+
+
+@pytest.mark.asyncio
+async def test_llm_null_action_returns_none():
+    """action=null (non-signal message) returns None."""
+    parser = LLMParser(provider="claude", api_key="fake-key")
+    payload = {**_SAMPLE_JSON, "action": None}
+    with patch("anthropic.AsyncAnthropic") as MockClient:
+        instance = MockClient.return_value
+        instance.messages.create = AsyncMock(return_value=_make_claude_response(payload))
+        signal = await parser.parse("have you seen the BTC price lately?")
+
+    assert signal is None
+
+
+@pytest.mark.asyncio
+async def test_llm_bad_json_returns_none():
+    """Malformed JSON from LLM is handled gracefully."""
+    parser = LLMParser(provider="claude", api_key="fake-key")
+    bad_resp = MagicMock()
+    bad_resp.content = [MagicMock(text="not valid json at all")]
+    with patch("anthropic.AsyncAnthropic") as MockClient:
+        instance = MockClient.return_value
+        instance.messages.create = AsyncMock(return_value=bad_resp)
+        signal = await parser.parse("some text")
+
+    assert signal is None
+
+
+@pytest.mark.asyncio
+async def test_llm_groq_strips_markdown_fences():
+    """Groq response wrapped in ```json ... ``` fences is parsed correctly."""
+    parser = LLMParser(provider="groq", api_key="fake-key")
+    fenced = f"```json\n{json.dumps(_SAMPLE_JSON)}\n```"
+    resp = MagicMock()
+    resp.choices = [MagicMock(message=MagicMock(content=fenced))]
+    with patch("groq.AsyncGroq") as MockClient:
+        instance = MockClient.return_value
+        instance.chat.completions.create = AsyncMock(return_value=resp)
+        signal = await parser.parse("eth long sl 3100 tp 3400")
+
+    assert signal is not None
+    assert signal.symbol == "ETH"
+
+
+@pytest.mark.asyncio
+async def test_llm_provider_none_returns_none():
+    """Provider 'none' always returns None without any API call."""
+    parser = LLMParser(provider="none", api_key="")
+    signal = await parser.parse("long btc sl 60000")
+    assert signal is None
 
 
 if __name__ == "__main__":

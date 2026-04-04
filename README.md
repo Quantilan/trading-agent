@@ -309,8 +309,9 @@ ENTRY_TOLERANCE=0.1       # ±% tolerance around entry zone
 PENDING_ENTRY_TIMEOUT=24  # hours before pending entry expires
 
 # ── LLM parser ─────────────────────────────────────────────
-# LLM_PROVIDER=claude
-# LLM_API_KEY=sk-ant-...
+# LLM_PROVIDER=claude          # claude | groq
+# LLM_API_KEY=sk-ant-...       # Claude key  (console.anthropic.com)
+# LLM_API_KEY=gsk_...          # Groq key    (console.groq.com — free tier)
 
 # ── Chart notifications ────────────────────────────────────
 CHART_TF=15m              # 5m | 15m | 1h | 4h
@@ -350,8 +351,15 @@ take at 3500
 
 | Mode | Description |
 |------|-------------|
-| `regex` | Rule-based, covers top 30 coins RU/EN. Fast, free. Edit `agent/signal_parser/patterns.json` to add aliases. |
-| `llm` | Claude (Anthropic). Understands any format. Requires `LLM_API_KEY`. |
+| `regex` | Rule-based, covers top 30 coins RU/EN/UA. Fast, free. Edit `agent/signal_parser/patterns.json` to add coin aliases or keywords. |
+| `llm` | LLM-based. Understands any language and format. Requires `LLM_PROVIDER` + `LLM_API_KEY`. |
+
+**LLM providers:**
+
+| Provider | Model | Cost | Sign up |
+|----------|-------|------|---------|
+| `claude` | `claude-haiku-4-5-20251001` | Paid | [console.anthropic.com](https://console.anthropic.com) |
+| `groq` | `llama-3.3-70b-versatile` | **Free tier** (14 400 req/day) | [console.groq.com](https://console.groq.com) |
 
 Supported actions: **LONG / SHORT / FLAT / MODIFY_SL / MODIFY_TP**
 
@@ -373,12 +381,16 @@ Supported actions: **LONG / SHORT / FLAT / MODIFY_SL / MODIFY_TP**
 ```
 trading-agent/
 ├── agent/
-│   ├── signal_parser/     # Regex patterns & validation rules
+│   ├── signal_parser/
+│   │   ├── patterns.json  # Coin aliases, action keywords (RU/EN/UA) — edit freely
+│   │   ├── regex_parser.py
+│   │   └── validator.py
 │   ├── chart.py           # Candlestick chart rendering (Telegram notifications)
 │   ├── coins.py           # Supported coins registry per exchange
 │   ├── config.py          # Config loader (.env → AgentConfig)
 │   ├── daily_secret.py    # Rotating HMAC key from license server
 │   ├── license.py         # License validation + device binding
+│   ├── llm_parser.py      # LLM-based signal parser (Claude / Groq)
 │   ├── main.py            # Agent orchestrator
 │   ├── order_executor.py  # Exchange interaction (ccxt)
 │   ├── personal_bot.py    # Telegram control bot
@@ -396,8 +408,11 @@ trading-agent/
 │   └── env_manager.py     # Safe .env read/write
 │
 ├── tests/
+│   ├── test_parcer.py     # Parser unit tests: regex + LLM (mocked)
+│   ├── test_validator.py  # Signal validator tests
 │   └── test_agent.py      # Full exchange cycle integration test
 │
+├── coins.json             # User-editable coin list (auto-created on first run)
 ├── Dockerfile             # Python 3.13-slim image
 ├── docker-compose.yml     # gui + agent services
 ├── Makefile               # Deployment shortcuts
@@ -406,6 +421,9 @@ trading-agent/
 ├── requirements.txt       # Python dependencies
 └── .env.example           # Configuration template
 ```
+
+> **`coins.json`** — list of base symbols the agent recognises and trades (e.g. `["BTC","ETH","SOL",...]`).
+> Created automatically from the built-in top-30 list if not present. Never overwritten on updates — edit freely to add or remove coins.
 
 ---
 
