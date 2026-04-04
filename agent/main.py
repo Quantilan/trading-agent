@@ -157,7 +157,11 @@ class TradingAgent:
         logger.info(f"💰 Balance: {total:.2f}$ (free: {free:.2f}$)")
 
         # 5. Notify start
-        await self.notifier.on_start(self.config.exchange, self.config.mode, total)
+        await self.notifier.on_start(
+            self.config.exchange, self.config.mode, total,
+            positions=self.state.get_open_positions(self.config.mode),
+            stats=self.state.get_pnl_stats(self.config.mode),
+        )
 
         # 6. Start background tasks
         await self.monitor.start()

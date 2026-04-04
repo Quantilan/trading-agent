@@ -136,17 +136,34 @@ class Notifier:
             return
         await self._send_text(f"⛔️ <b>AGENT ERROR</b>\n{message}")
 
-    async def on_start(self, exchange: str, mode: str, balance: float) -> None:
+    async def on_start(self, exchange: str, mode: str, balance: float,
+                       positions: list = None, stats: dict = None) -> None:
         if not self.enabled:
             return
+        from agent.version import VERSION, BUILD_DATE
         mode_emoji = "📋" if mode == "paper" else "💰"
-        text = (
-            f"🚀 <b>Agent started</b>\n\n"
-            f"Exchange: {exchange.upper()}\n"
-            f"Mode:     {mode_emoji} {mode.upper()}\n"
-            f"Balance:  {balance:.2f}$"
-        )
-        await self._send_text(text)
+        lines = [
+            f"🚀 <b>Agent started</b>\n",
+            f"Exchange: {exchange.upper()}",
+            f"Mode:     {mode_emoji} {mode.upper()}",
+            f"Balance:  {balance:.2f}$",
+            f"Version:  v{VERSION} ({BUILD_DATE})",
+        ]
+
+        if positions:
+            lines.append(f"\n📂 <b>Restored {len(positions)} position(s):</b>")
+            for p in positions:
+                pnl_str = f"  {p.unrealized_pnl:+.2f}$" if p.unrealized_pnl else ""
+                lines.append(f"  • {p.symbol} {p.side.value} @ {p.entry_price}{pnl_str}")
+
+        if stats and stats.get("total", 0) > 0:
+            wr = round(stats["wins"] / stats["total"] * 100, 1) if stats["total"] else 0
+            lines.append(
+                f"\n📊 {mode.upper()} stats: {stats['total']} trades  "
+                f"WR {wr}%  PnL {stats['realized']:+.2f}$"
+            )
+
+        await self._send_text("\n".join(lines))
 
     async def on_info(self, message: str) -> None:
         if not self.enabled:
