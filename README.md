@@ -3,10 +3,10 @@
 **Autonomous Crypto Trading Agent That Runs on Your Infrastructure**
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![Status](https://img.shields.io/badge/status-active%20development-success)](#)
+[![Version](https://img.shields.io/badge/version-1.0.0-success)](#)
 [![License: BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-orange.svg)](LICENSE)
 
-> ⚡ **First stable version will be ready in May 2026**
+> ⚡ **v1.0.0 — stable release**
 
 ---
 
@@ -23,7 +23,9 @@
 
 ✅ Done! Dependencies install automatically on the first run, then the browser opens at **http://localhost:8080** — configure and start the agent.
 
-###  Makefile 
+### 🐧 Mac / Linux (make)
+
+> `make` comes pre-installed on macOS and most Linux distros. Not available on Windows by default — use `start.bat` instead.
 
 ```bash
 git clone https://github.com/Quantilan/trading-agent.git
