@@ -141,10 +141,11 @@ class RegexParser:
         )
 
         # 9. YOUR ORIGINAL LOGGER (The one you asked to keep)
+        tp_display = signal.take_levels or signal.take_price or (f"{signal.tp_pct*100:.1f}%" if signal.tp_pct else 0)
         logger.info(
             f"Parsed signal: {signal.symbol} {signal.action} "
             f"SL:{signal.stop_price or signal.sl_pct} "
-            f"TP:{signal.take_levels or signal.take_price} "
+            f"TP:{tp_display} "
             f"Props:{signal.take_proportions}"
         )
         
