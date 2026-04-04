@@ -83,7 +83,7 @@ Quantilan Trading Agent is an autonomous cryptocurrency trading bot that runs on
 │  │                           │                  │  │
 │  │                      state_manager           │  │
 │  └───────────────────────────┼──────────────────┘  │
-│                              │ ccxt REST API        │
+│                              │ ccxt REST API       │
 └──────────────────────────────┼─────────────────────┘
                                ▼
 ┌────────────────────────────────────────────────────┐
@@ -172,7 +172,7 @@ python setup_gui.py [--port 8080] [--no-browser]
 
 Open **http://localhost:8080** (or your VPS IP).
 
-### Left column — Configuration
+### Configuration
 
 | Section | What to fill in |
 |---------|----------------|
@@ -182,7 +182,7 @@ Open **http://localhost:8080** (or your VPS IP).
 | **Signal & Notifications** | Signal source (Quantilan Server / Telegram), license key, parser mode |
 | **Chart & Advanced** *(collapsed)* | Chart timeframe (5m/15m/1h/4h) and number of candles (25/50/75/100) for Telegram chart notifications |
 
-### Right column — Tests & Status
+### Tests & Status
 
 | Panel | What it shows |
 |-------|--------------|
