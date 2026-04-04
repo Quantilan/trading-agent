@@ -8,9 +8,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Install uv (fast Python package installer)
+RUN pip install --no-cache-dir uv
+
 # Install Python deps first (layer cache — rebuilds only when requirements change)
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN uv pip install --system --no-cache -r requirements.txt
 
 # Copy project files
 COPY . .
