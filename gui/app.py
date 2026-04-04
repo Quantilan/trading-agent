@@ -38,6 +38,13 @@ sys.path.insert(0, str(_ROOT))
 from gui.env_manager import read_env, write_env, validate_field, ENV_DEFAULTS
 
 
+def _parse_int(value: str, default: int = 0) -> int:
+    try:
+        return int(str(value).strip())
+    except (ValueError, AttributeError):
+        return default
+
+
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
     yield
@@ -150,7 +157,7 @@ def _build_config(fields: Dict[str, str]):
         mode             = fields.get("MODE", "paper"),
         paper_balance    = float(fields.get("PAPER_BALANCE", "10000") or "10000"),
         tg_token         = fields.get("TG_TOKEN", ""),
-        tg_chat_id       = int(fields.get("TG_CHAT_ID", "0") or "0"),
+        tg_chat_id       = _parse_int(fields.get("TG_CHAT_ID", "0")),
         signal_source    = fields.get("SIGNAL_SOURCE", "telegram"),
         signal_server    = fields.get("SIGNAL_SERVER", ""),
         license_key      = fields.get("LICENSE_KEY", ""),

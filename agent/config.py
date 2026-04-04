@@ -14,6 +14,14 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 
+def _parse_int(value: str, default: int = 0) -> int:
+    """Parse integer from env string, return default if not a valid number."""
+    try:
+        return int(value.strip())
+    except (ValueError, AttributeError):
+        return default
+
+
 # ─────────────────────────────────────────
 # SUPPORTED EXCHANGES
 # ─────────────────────────────────────────
@@ -112,7 +120,7 @@ def load_config() -> AgentConfig:
         mode                = os.getenv("MODE", "paper").lower().strip(),
         paper_balance       = float(os.getenv("PAPER_BALANCE", "10000") or "10000"),
         tg_token            = os.getenv("TG_TOKEN", ""),
-        tg_chat_id          = int(os.getenv("TG_CHAT_ID", "0") or "0"),
+        tg_chat_id          = _parse_int(os.getenv("TG_CHAT_ID", "0")),
         parser_mode             = (os.getenv("PARSER_MODE") or "regex").lower().strip(),
         confirm_trade           = os.getenv("CONFIRM_TRADE", "true").lower() != "false",
         default_sl_pct          = float(os.getenv("DEFAULT_SL_PCT", "2.0")),
