@@ -79,11 +79,11 @@ Quantilan Trading Agent is an autonomous cryptocurrency trading bot that runs on
 │  │  signal_client  ──►  risk_manager            │  │
 │  │  personal_bot   ──►  signal_parser           │  │
 │  │                           │                  │  │
-│  │                      order_executor ◄──┐     │  │
-│  │                           │           │     │  │
-│  │              position_monitor    price_watcher│ │
+│  │                      order_executor ◄─┐      │  │
+│  │                           │           │      │  │
+│  │              position_monitor   price_watcher│  │
 │  │              (SL/TP/trailing)    (deferred   │  │
-│  │                           │      entries)   │  │
+│  │                           │      entries)    │  │
 │  │                      state_manager           │  │
 │  │              state_<exchange>_<mode>.json    │  │
 │  └───────────────────────────┼──────────────────┘  │
