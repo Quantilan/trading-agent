@@ -159,6 +159,12 @@ def _validate(cfg: AgentConfig) -> None:
         if not cfg.signal_server:
             errors.append("SIGNAL_SERVER is required for SIGNAL_SOURCE=server")
 
+    # Trailing stop is incompatible with Quantilan Server signals —
+    # the strategy manages SL levels itself; trailing would interfere.
+    if cfg.trailing_stop and cfg.signal_source == "server":
+        logger.warning("⚠️  TRAILING_STOP disabled — not compatible with Quantilan Server signals")
+        cfg.trailing_stop = False
+
     if cfg.parser_mode!='regex' and cfg.llm_provider not in ("none", "claude"):
         logger.warning(f"⚠️  Unknown LLM_PROVIDER='{cfg.llm_provider}' — using 'none'")
         cfg.llm_provider = "none"
