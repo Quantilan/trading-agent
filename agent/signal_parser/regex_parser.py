@@ -211,16 +211,25 @@ class RegexParser:
         # ([\d.]+) -> price
         # \s*(%)? -> optional percentage
 
+        # 1. Short form: "sl: 1%", "sl 2%", "sl:50000"
+        m = re.search(r"(?i)\bsl\b[:\s]*([\d.]+)\s*(%)?", text)
+        if m:
+            try:
+                val = float(m.group(1))
+                is_pct = m.group(2) is not None
+                return (val / 100, 0.0) if is_pct else (0.0, val)
+            except ValueError:
+                pass
+
+        # 2. Full keywords: "стоп ETH на 1750", "stop-loss: 66000"
         pattern = r"(?i)(?:стоп[а-яіi\-]*|stop[- ]?loss)[\s\w\-:]*?([\d.]+)\s*(%)?"
         match = re.search(pattern, text)
-        
         if not match:
             return 0.0, 0.0
 
         try:
             val = float(match.group(1))
             is_pct = match.group(2) is not None
-            # If it's a percentage (e.g. 2%), return as 0.02
             return (val / 100, 0.0) if is_pct else (0.0, val)
         except (ValueError, IndexError):
             return 0.0, 0.0

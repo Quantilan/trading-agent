@@ -110,5 +110,35 @@ def test_entry_mid_used_as_entry(parser):
     assert signal.entry == pytest.approx(69000.0)
 
 
+# ── sl/tp shorthand parsing ───────────────────────────────────────────────────
+
+def test_sl_shorthand_pct(parser):
+    """'sl: 1%' shorthand must parse to 1%, not fall back to default 2%."""
+    text = "long xrp sl: 1% tp: 3%"
+    signal = parser.parse(text)
+    assert signal is not None
+    assert signal.symbol == "XRP"
+    assert signal.action == "LONG"
+    assert signal.sl_pct == pytest.approx(0.01)
+    assert signal.tp_pct == pytest.approx(0.03)
+
+def test_sl_shorthand_no_space(parser):
+    """'sl:1%' without space still parses correctly."""
+    text = "short btc sl:2% tp:4%"
+    signal = parser.parse(text)
+    assert signal is not None
+    assert signal.action == "SHORT"
+    assert signal.sl_pct == pytest.approx(0.02)
+    assert signal.tp_pct == pytest.approx(0.04)
+
+def test_sl_shorthand_space_no_colon(parser):
+    """'sl 1.5%' (space, no colon) parses correctly."""
+    text = "long eth sl 1.5% tp 5%"
+    signal = parser.parse(text)
+    assert signal is not None
+    assert signal.sl_pct == pytest.approx(0.015)
+    assert signal.tp_pct == pytest.approx(0.05)
+
+
 if __name__ == "__main__":
     pytest.main([__file__])
