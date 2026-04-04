@@ -27,6 +27,19 @@ echo
 _sep
 
 # ── 1. Docker ────────────────────────────────────────────────────────────────
+# ── 0. System deps (make, git, curl) ─────────────────────────────────────────
+if ! command -v make &>/dev/null; then
+    _info "Installing make..."
+    sudo apt-get install -y -qq make
+    _ok "make installed"
+fi
+if ! command -v git &>/dev/null; then
+    _info "Installing git..."
+    sudo apt-get install -y -qq git
+    _ok "git installed"
+fi
+_sep
+
 DOCKER_JUST_INSTALLED=false
 if command -v docker &>/dev/null && docker info &>/dev/null 2>&1; then
     _ok "Docker already installed ($(docker --version | cut -d' ' -f3 | tr -d ','))"
