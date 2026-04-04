@@ -27,21 +27,29 @@ echo
 _sep
 
 # ── 1. Docker ────────────────────────────────────────────────────────────────
-if command -v docker &>/dev/null; then
+DOCKER_JUST_INSTALLED=false
+if command -v docker &>/dev/null && docker info &>/dev/null 2>&1; then
     _ok "Docker already installed ($(docker --version | cut -d' ' -f3 | tr -d ','))"
 else
     _info "Installing Docker..."
     curl -fsSL https://get.docker.com | sh
-    # Add current user to docker group so we can run without sudo
-    if id -nG "$USER" | grep -qw docker; then
-        :
-    else
+    if ! id -nG "$USER" | grep -qw docker; then
         sudo usermod -aG docker "$USER"
-        _warn "Added $USER to docker group. Log out and back in if docker commands fail."
+        DOCKER_JUST_INSTALLED=true
+        _warn "Added $USER to docker group"
     fi
     _ok "Docker installed"
 fi
 _sep
+
+# Helper: run docker compose with sudo if group not yet active in this session
+_compose() {
+    if $DOCKER_JUST_INSTALLED || ! docker info &>/dev/null 2>&1; then
+        sudo docker compose "$@"
+    else
+        docker compose "$@"
+    fi
+}
 
 # ── 2. Clone or update repo ───────────────────────────────────────────────────
 if [ -d "$INSTALL_DIR/.git" ]; then
@@ -69,7 +77,7 @@ _sep
 
 # ── 4. Build Docker image ─────────────────────────────────────────────────────
 _info "Building Docker image (this takes ~2 min on first run)..."
-docker compose build
+_compose build
 _ok "Image built"
 _sep
 
@@ -93,6 +101,11 @@ echo
 echo "  2. Start the Setup GUI on the VPS:"
 echo
 echo "       cd $INSTALL_DIR && make gui"
+echo
+if $DOCKER_JUST_INSTALLED; then
+echo "     NOTE: if you get 'permission denied' — run: newgrp docker"
+echo "     (or log out and back in — one time only)"
+fi
 echo
 echo "  3. Open in your browser:  http://localhost:8080"
 echo "     Configure exchange, Telegram, signal source — then Start Agent."
