@@ -207,6 +207,19 @@ Clicking **Start Agent** with unchecked items shows a warning with specific reco
 
 ---
 
+## Updating
+
+```bash
+cd ~/trading-agent
+git pull
+make build
+make restart
+```
+
+That's it — pulls latest code, rebuilds the image, restarts the agent.
+
+---
+
 ## Docker Deployment
 
 ### Prerequisites
