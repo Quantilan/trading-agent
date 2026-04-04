@@ -34,7 +34,13 @@ from .state import StateManager, Position, PositionSide, PositionStatus
 logger = logging.getLogger(__name__)
 
 # Callback type: (symbol, reason, close_price) → None
-ClosedCallback = Callable[[str, str, float], Awaitable[None]]
+ClosedCallback    = Callable[[str, str, float], Awaitable[None]]
+# Callback type: (position,) → None  — called after trailing SL is moved
+TrailingCallback  = Callable[['Position'], Awaitable[None]]
+
+# Trailing stop constants
+_TRAIL_TRIGGER  = 1.5    # upnl must be ≥ 1.5 × sl_pct to start trailing
+_TRAIL_DISTANCE = 0.618  # new SL is placed at 0.618 × sl_pct from current price
 
 
 class PositionMonitor:
@@ -49,12 +55,16 @@ class PositionMonitor:
         notifier,               # Notifier (for direct send if personal_bot not set)
         mode: str,              # "paper" | "trade"
         on_position_closed: ClosedCallback,
+        trailing_stop: bool = False,
+        on_trailing_stop: Optional[TrailingCallback] = None,
     ):
         self.executor           = executor
         self.state              = state
         self.notifier           = notifier
         self.mode               = mode
         self.on_position_closed = on_position_closed
+        self.trailing_stop      = trailing_stop
+        self.on_trailing_stop   = on_trailing_stop
 
         self._running    = False
         self._tasks:     Dict[str, asyncio.Task] = {}   # paper: symbol → task
@@ -296,6 +306,8 @@ class PositionMonitor:
                         fully_closed = await self._handle_hit(position, reason, close_price)
                         if fully_closed:
                             return
+                    else:
+                        await self._check_trailing_stop(position, c)
 
         except asyncio.CancelledError:
             raise
@@ -333,6 +345,8 @@ class PositionMonitor:
                         fully_closed = await self._handle_hit(position, reason, close_price)
                         if fully_closed:
                             return
+                    else:
+                        await self._check_trailing_stop(position, c)
             except asyncio.CancelledError:
                 raise
             except Exception as e:
@@ -418,6 +432,21 @@ class PositionMonitor:
                     upnl = ep.get('unrealizedPnl')
                     if upnl is not None:
                         pos.unrealized_pnl = float(upnl)
+
+                    # Trailing stop check (trade mode): estimate current price from mark or PnL
+                    if self.trailing_stop:
+                        mark = float(ep.get('markPrice') or
+                                     ep.get('info', {}).get('markPrice') or 0)
+                        if mark <= 0 and upnl is not None and pos.amount > 0:
+                            # Fallback: price from unrealized PnL
+                            # PnL = (mark - entry) × amount  (base currency contracts)
+                            upnl_val = float(upnl)
+                            mark = (pos.entry_price + upnl_val / pos.amount
+                                    if pos.side == PositionSide.LONG
+                                    else pos.entry_price - upnl_val / pos.amount)
+                        if mark > 0:
+                            await self._check_trailing_stop(pos, mark)
+
                     # Detect partial TP fill: amount on exchange has decreased
                     if pos.take_levels and pos.take_amounts:
                         raw = ep.get('contracts') or ep.get('amount') or ep.get('size')
@@ -542,6 +571,94 @@ class PositionMonitor:
     # ─────────────────────────────────────
     # HELPERS
     # ─────────────────────────────────────
+
+    async def _check_trailing_stop(self, position: Position, close_price: float) -> bool:
+        """
+        Trail the stop-loss on each closed candle.
+
+        Algorithm:
+          - Compute original SL distance as % of entry (from position.sl_pct, or
+            derived from abs stop if sl_pct == 0).
+          - Trigger when unrealized PnL % ≥ 1.5 × sl_pct.
+          - New SL placed at 0.618 × sl_pct distance from current candle close.
+          - Only move SL toward the position (never widen it).
+          - Notifies user with chart on each adjustment.
+
+        Returns True if SL was moved.
+        """
+        if not self.trailing_stop:
+            return False
+
+        # Determine original SL % from entry
+        sl_pct = position.sl_pct
+        if sl_pct <= 0 and position.stop_price > 0 and position.entry_price > 0:
+            sl_pct = abs(position.entry_price - position.stop_price) / position.entry_price * 100
+        if sl_pct <= 0:
+            return False
+
+        # Unrealized PnL % relative to entry price
+        if position.side == PositionSide.LONG:
+            upnl_pct = (close_price - position.entry_price) / position.entry_price * 100
+        else:
+            upnl_pct = (position.entry_price - close_price) / position.entry_price * 100
+
+        if upnl_pct <= 0:
+            return False   # Position underwater — don't trail
+
+        # Determine trailing distance:
+        #   Phase 1 (any profit):     trail at original sl_pct — follow price, protect gains
+        #   Phase 2 (profit ≥ 1.5×): tighten to 0.618 × sl_pct — lock in more
+        if upnl_pct >= _TRAIL_TRIGGER * sl_pct:
+            trail_pct = _TRAIL_DISTANCE * sl_pct   # e.g. 2% → 1.236%
+        else:
+            trail_pct = sl_pct                      # regular distance
+
+        price_prec, _, _, _ = self.executor.get_market_params(position.symbol)
+        trail_dist = trail_pct / 100
+
+        if position.side == PositionSide.LONG:
+            new_sl = round(close_price * (1.0 - trail_dist), price_prec)
+            if new_sl <= position.stop_price:
+                return False   # No improvement
+            if new_sl >= close_price:
+                return False   # Sanity
+        else:
+            new_sl = round(close_price * (1.0 + trail_dist), price_prec)
+            if new_sl >= position.stop_price:
+                return False
+            if new_sl <= close_price:
+                return False
+
+        logger.info(
+            f"[{position.symbol}] 🔒 Trailing stop: {position.stop_price} → {new_sl} "
+            f"(upnl {upnl_pct:.2f}%, dist {trail_pct:.3f}%"
+            + (" [tightened]" if upnl_pct >= _TRAIL_TRIGGER * sl_pct else "") + ")"
+        )
+
+        # Update SL on exchange (trade) or in state only (paper)
+        if self.mode == "trade":
+            new_stop_id, err = await self.executor.modify_stop(
+                position.symbol, position.stop_id,
+                position.side, position.amount, new_sl
+            )
+            if err:
+                logger.warning(f"[{position.symbol}] Trailing stop modify failed: {err}")
+                return False
+            position.stop_price = new_sl
+            if new_stop_id:
+                position.stop_id = new_stop_id
+        else:
+            position.stop_price = new_sl
+
+        self.state._save()
+
+        if self.on_trailing_stop:
+            try:
+                await self.on_trailing_stop(position)
+            except Exception as e:
+                logger.error(f"[{position.symbol}] trailing stop notify error: {e}")
+
+        return True
 
     def _check_hit(
         self, position: Position, high: float, low: float

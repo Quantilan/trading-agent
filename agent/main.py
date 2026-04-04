@@ -105,6 +105,8 @@ class TradingAgent:
             notifier           = self.notifier,
             mode               = config.mode,
             on_position_closed = self._on_position_closed_by_monitor,
+            trailing_stop      = config.trailing_stop,
+            on_trailing_stop   = self._on_trailing_stop,
         )
 
         # Price watcher — deferred entries (WebSocket primary, REST fallback)
@@ -579,6 +581,14 @@ class TradingAgent:
         if new_stop_id:
             position.stop_id = new_stop_id
         self.state.set_position(position)
+        await self._notify_chart('modify_sl', position)
+
+    # ─────────────────────────────────────
+    # TRAILING STOP (by monitor)
+    # ─────────────────────────────────────
+
+    async def _on_trailing_stop(self, position: Position) -> None:
+        """Called by PositionMonitor after trailing stop has moved SL. Notify + chart."""
         await self._notify_chart('modify_sl', position)
 
     # ─────────────────────────────────────
