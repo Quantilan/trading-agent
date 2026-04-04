@@ -580,6 +580,27 @@ input[type=range]::-webkit-slider-thumb {
           <span id="ci-mode" class="test-chip">Mode —</span>
         </div>
 
+        <!-- ── IP restriction hint (shown when connect() fails) ── -->
+        <div id="ip-restrict-hint" style="display:none; margin-top:10px; padding:9px 12px;
+          background:rgba(210,153,34,.07); border:1px solid rgba(210,153,34,.35); border-radius:6px;
+          font-size:13px; color:var(--yellow); line-height:1.6">
+          💡 <b>Connection failed.</b> If your API key has IP restrictions enabled, add your VPS IP to the allowed list in the exchange settings.
+        </div>
+
+        <!-- ── Coins availability (shown after connection test, both paper and trade) ── -->
+        <div id="card-coins" style="display:none; margin-top:14px; padding-top:14px; border-top:1px solid var(--border)">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px">
+            <span style="font-size:13px; font-weight:600; color:var(--text); text-transform:uppercase; letter-spacing:.4px">Supported Coins</span>
+            <span id="coins-header-info" style="font-size:12px; color:var(--muted)"></span>
+          </div>
+          <div id="coins-grid" style="
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 4px 8px;
+            font-size: 13px;
+          "></div>
+        </div>
+
         <!-- ── Order test — trade mode only ── -->
         <div id="card-order-test" style="display:none; margin-top:14px; padding-top:14px; border-top:1px solid var(--border)">
           <div style="font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; margin-bottom:10px">⚡ Order Test</div>
@@ -611,20 +632,6 @@ input[type=range]::-webkit-slider-thumb {
           <div style="margin-top:10px">
             <div style="font-size:13px; color:var(--muted); margin-bottom:6px">LIVE LOG</div>
             <div class="console" id="test-console"><span class="console-empty">Test output will appear here...</span></div>
-          </div>
-
-          <!-- Coins availability (shown after connection test) -->
-          <div id="card-coins" style="display:none; margin-top:14px">
-            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px">
-              <span style="font-size:13px; font-weight:600; color:var(--text)">Coins</span>
-              <span id="coins-header-info" style="font-size:12px; color:var(--muted)"></span>
-            </div>
-            <div id="coins-grid" style="
-              display: grid;
-              grid-template-columns: repeat(5, 1fr);
-              gap: 4px 8px;
-              font-size: 13px;
-            "></div>
           </div>
         </div>
 
@@ -674,9 +681,46 @@ input[type=range]::-webkit-slider-thumb {
           border-radius:6px; font-size:13px; color:#fbbf24; line-height:1.5">
         </div>
 
+        <div class="slider-field">
+          <div class="slider-label">
+            <span>Default Stop-Loss %</span>
+            <span class="slider-value" id="v-DEFAULT_SL_PCT">2.0%</span>
+          </div>
+          <input type="range" id="DEFAULT_SL_PCT" min="0.5" max="10" step="0.5" value="2"
+                 oninput="document.getElementById('v-DEFAULT_SL_PCT').textContent = parseFloat(this.value).toFixed(1) + '%'; document.getElementById('DEFAULT_SL_PCT_txt').value = this.value">
+          <div class="slider-ticks"><span>0.5%</span><span>5%</span><span>10%</span></div>
+          <div id="sl-range-warn" style="display:none; margin-top:6px; padding:5px 8px; background:rgba(210,153,34,.07); border:1px solid rgba(210,153,34,.35); border-radius:5px; font-size:12px; color:var(--yellow)">
+            <span id="sl-range-warn-text"></span><br>
+            <input type="number" id="DEFAULT_SL_PCT_txt" min="0.1" max="100" step="0.1" style="margin-top:5px; max-width:100px; font-size:13px"
+                   oninput="document.getElementById('DEFAULT_SL_PCT').value = Math.min(parseFloat(this.value)||2, 10); document.getElementById('v-DEFAULT_SL_PCT').textContent = parseFloat(this.value).toFixed(1) + '%'">
+          </div>
+        </div>
+
+        <div class="slider-field">
+          <div class="slider-label">
+            <span>Default Take-Profit %</span>
+            <span class="slider-value" id="v-DEFAULT_TP_PCT">5.0%</span>
+          </div>
+          <input type="range" id="DEFAULT_TP_PCT" min="1" max="10" step="0.5" value="5"
+                 oninput="document.getElementById('v-DEFAULT_TP_PCT').textContent = parseFloat(this.value).toFixed(1) + '%'; document.getElementById('DEFAULT_TP_PCT_txt').value = this.value">
+          <div class="slider-ticks"><span>1%</span><span>5%</span><span>10%</span></div>
+          <div style="font-size:12px; color:var(--muted); margin-top:3px">Fallback TP when not specified in the signal (0 = disabled)</div>
+          <div id="tp-range-warn" style="display:none; margin-top:6px; padding:5px 8px; background:rgba(210,153,34,.07); border:1px solid rgba(210,153,34,.35); border-radius:5px; font-size:12px; color:var(--yellow)">
+            <span id="tp-range-warn-text"></span><br>
+            <input type="number" id="DEFAULT_TP_PCT_txt" min="0" max="100" step="0.5" style="margin-top:5px; max-width:100px; font-size:13px"
+                   oninput="document.getElementById('DEFAULT_TP_PCT').value = Math.min(parseFloat(this.value)||5, 10); document.getElementById('v-DEFAULT_TP_PCT').textContent = parseFloat(this.value).toFixed(1) + '%'">
+          </div>
+        </div>
+
         <div class="field">
-          <label>Default Stop-Loss %</label>
-          <input type="number" id="DEFAULT_SL_PCT" value="2.0" min="0.1" max="20" step="0.1" style="max-width:120px">
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer; text-transform:none; letter-spacing:0; font-size:15px; font-weight:500; color:var(--text)">
+            <input type="checkbox" id="TRAILING_STOP" style="width:auto; accent-color:var(--accent)">
+            <span>Trailing stop</span>
+            <span style="color:var(--muted); font-size:13px; font-weight:400">— tighten SL as profit grows</span>
+          </label>
+          <div style="font-size:12px; color:var(--muted); margin-top:4px; line-height:1.5; padding-left:24px">
+            When unrealized profit exceeds 1.5× SL, moves stop to lock in ~62% of the gain.
+          </div>
         </div>
 
       </div>
@@ -1047,24 +1091,24 @@ async function loadConfig() {
     setIfVal('PARSER_MODE',  f.PARSER_MODE);
     setIfVal('LLM_PROVIDER', f.LLM_PROVIDER);
 
+    // Show masked secret values as text (not password dots) so the mask is readable
+    ['EXCHANGE_API_KEY','EXCHANGE_SECRET','EXCHANGE_PASSPHRASE','TG_TOKEN','LICENSE_KEY','LLM_API_KEY'].forEach(key => {
+      const inp = document.getElementById(key);
+      if (inp && inp.value && inp.value.includes('****')) {
+        inp.type = 'text';
+        inp.style.color = 'var(--muted)';
+        inp.dataset.masked = 'true';
+      }
+    });
+
     // Sliders
-    if (f.MARGIN_PCT) {
-      const el = document.getElementById('MARGIN_PCT');
-      el.value = parseFloat(f.MARGIN_PCT);
-      document.getElementById('v-MARGIN_PCT').textContent = el.value + '%';
-    }
-    if (f.LEVERAGE) {
-      const el = document.getElementById('LEVERAGE');
-      el.value = parseInt(f.LEVERAGE);
-      document.getElementById('v-LEVERAGE').textContent = el.value + 'x';
-    }
-    if (f.MAX_POSITIONS) {
-      const el = document.getElementById('MAX_POSITIONS');
-      el.value = parseInt(f.MAX_POSITIONS);
-      document.getElementById('v-MAX_POSITIONS').textContent = el.value;
-    }
-    if (f.DEFAULT_SL_PCT) {
-      setIfVal('DEFAULT_SL_PCT', f.DEFAULT_SL_PCT);
+    if (f.MARGIN_PCT)    applySlider('MARGIN_PCT',    f.MARGIN_PCT,    'v-MARGIN_PCT',    '%');
+    if (f.LEVERAGE)      applySlider('LEVERAGE',      f.LEVERAGE,      'v-LEVERAGE',      'x');
+    if (f.MAX_POSITIONS) applySlider('MAX_POSITIONS', f.MAX_POSITIONS, 'v-MAX_POSITIONS', '');
+    if (f.DEFAULT_SL_PCT) applySlider('DEFAULT_SL_PCT', f.DEFAULT_SL_PCT, 'v-DEFAULT_SL_PCT', '%', 'sl-range-warn');
+    if (f.DEFAULT_TP_PCT) applySlider('DEFAULT_TP_PCT', f.DEFAULT_TP_PCT, 'v-DEFAULT_TP_PCT', '%', 'tp-range-warn');
+    if (f.TRAILING_STOP !== undefined) {
+      document.getElementById('TRAILING_STOP').checked = f.TRAILING_STOP === 'true';
     }
 
     // Radio: MODE
@@ -1109,6 +1153,38 @@ function setIfVal(id, val) {
   const el = document.getElementById(id);
   if (!el || !val) return;
   el.value = val;
+}
+
+// Apply a slider value, clamping to [min, max] and showing a warning if value was out of range
+function applySlider(sliderId, rawVal, labelId, suffix, warnId) {
+  const slider = document.getElementById(sliderId);
+  const label  = document.getElementById(labelId);
+  if (!slider) return;
+  const num  = parseFloat(rawVal);
+  if (isNaN(num)) return;
+  const min  = parseFloat(slider.min);
+  const max  = parseFloat(slider.max);
+  const step = parseFloat(slider.step) || 1;
+  const clamped = Math.min(Math.max(num, min), max);
+  slider.value = Math.round(clamped / step) * step;
+  const displayVal = suffix === 'x' ? Math.round(num) + 'x'
+                   : suffix === '%' ? num.toFixed(1) + '%'
+                   : num;
+  if (label) label.textContent = displayVal;
+  if (warnId) {
+    const warn     = document.getElementById(warnId);
+    const warnText = document.getElementById(warnId + '-text');
+    const txtInput = document.getElementById(sliderId + '_txt');
+    if (warn) {
+      if (num < min || num > max) {
+        if (warnText) warnText.textContent = `⚠️ Current value ${num}${suffix} is outside the slider range (${min}–${max}${suffix}). Edit in the field below:`;
+        if (txtInput) txtInput.value = num;
+        warn.style.display = 'block';
+      } else {
+        warn.style.display = 'none';
+      }
+    }
+  }
 }
 
 // ── Mode change ───────────────────────────────────────────────────────────────
@@ -1237,9 +1313,14 @@ function updateDot(key, status, hint) {
 }
 
 function onSecretInput(key) {
-  // Client-side basic check (not placeholder check — we don't re-validate server-side on each keystroke)
   const el = document.getElementById(key);
   if (!el) return;
+  // Switch from masked-text display to password input when user starts editing
+  if (el.dataset.masked === 'true') {
+    el.type = 'password';
+    el.style.color = '';
+    el.dataset.masked = '';
+  }
   const v = el.value.trim();
   if (!v) {
     updateDot(key, 'empty', 'Not set');
@@ -1302,7 +1383,9 @@ function collectFields() {
     MARGIN_PCT:             el('MARGIN_PCT'),
     LEVERAGE:               el('LEVERAGE'),
     MAX_POSITIONS:          el('MAX_POSITIONS'),
-    DEFAULT_SL_PCT:         el('DEFAULT_SL_PCT'),
+    DEFAULT_SL_PCT:         elOrOverride('DEFAULT_SL_PCT', 'sl-range-warn'),
+    DEFAULT_TP_PCT:         elOrOverride('DEFAULT_TP_PCT', 'tp-range-warn'),
+    TRAILING_STOP:          document.getElementById('TRAILING_STOP').checked ? 'true' : 'false',
     MODE:                   getRadioValue('MODE') || 'paper',
     PAPER_BALANCE:          el('PAPER_BALANCE') || '10000',
     SIGNAL_SOURCE:          getRadioValue('SIGNAL_SOURCE') || 'telegram',
@@ -1324,12 +1407,23 @@ function el(id) {
   return e ? e.value.trim() : '';
 }
 
+// Returns the text-override value when an out-of-range warning is visible, otherwise the slider value
+function elOrOverride(sliderId, warnId) {
+  const warn = document.getElementById(warnId);
+  if (warn && warn.style.display !== 'none') {
+    const txt = document.getElementById(sliderId + '_txt');
+    if (txt && txt.value.trim()) return txt.value.trim();
+  }
+  return el(sliderId);
+}
+
 // ── .env diff check ──────────────────────────────────────────────────────────
 const _FIELD_LABELS = {
   MODE:'Mode', EXCHANGE:'Exchange', MARGIN_PCT:'Margin %', LEVERAGE:'Leverage',
   MAX_POSITIONS:'Max positions', PAPER_BALANCE:'Paper balance', EXCHANGE_STBC:'Stablecoin',
   SIGNAL_SOURCE:'Signal source', PARSER_MODE:'Parser mode', CONFIRM_TRADE:'Confirm trade',
-  DEFAULT_SL_PCT:'Default SL %', LLM_PROVIDER:'LLM provider', LLM_MODEL:'LLM model',
+  DEFAULT_SL_PCT:'Default SL %', DEFAULT_TP_PCT:'Default TP %', TRAILING_STOP:'Trailing stop',
+  LLM_PROVIDER:'LLM provider', LLM_MODEL:'LLM model',
   CHART_TF:'Chart timeframe', CHART_BARS:'Chart bars', LOG_LEVEL:'Log level',
   TG_CHAT_ID:'Telegram chat ID', SIGNAL_SERVER:'Signal server',
 };
@@ -1439,9 +1533,11 @@ function resetTests() {
   setChip('ci-exchange', 'Exchange —');
   setChip('ci-balance',  'Balance —');
   setChip('ci-mode',     'Mode —');
-  // Hide coins block
+  // Hide coins block and IP hint
   const coinsCard = document.getElementById('card-coins');
   if (coinsCard) coinsCard.style.display = 'none';
+  const ipHint = document.getElementById('ip-restrict-hint');
+  if (ipHint) ipHint.style.display = 'none';
   // Reset readiness checklist items to idle
   ['chk-connection','chk-ordertest','chk-telegram','chk-signal'].forEach(id => {
     const el = document.getElementById(id);
@@ -1466,6 +1562,8 @@ function setChip(id, text, cls = 'idle') {
 }
 
 // ── Coins block ──────────────────────────────────────────────────────────────
+const _TOP_COINS = new Set(['BTC', 'ETH', 'SOL']);
+
 function renderCoins(coins, stbc) {
   const card   = document.getElementById('card-coins');
   const grid   = document.getElementById('coins-grid');
@@ -1484,9 +1582,11 @@ function renderCoins(coins, stbc) {
     `</span>`;
 
   grid.innerHTML = entries.map(([sym, c]) => {
-    const icon  = c.available ? '<span style="color:var(--green)">✓</span>' : '<span style="color:var(--red)">✗</span>';
-    const color = c.available ? '' : 'color:var(--muted)';
-    return `<div style="${color}">${icon} ${sym}</div>`;
+    const icon   = c.available ? '<span style="color:var(--green)">✓</span>' : '<span style="color:var(--red)">✗</span>';
+    const color  = c.available ? '' : 'color:var(--muted)';
+    const bold   = _TOP_COINS.has(sym) ? 'font-weight:700' : '';
+    const styles = [color, bold].filter(Boolean).join(';');
+    return `<div style="${styles}">${icon} ${sym}</div>`;
   }).join('');
 
   card.style.display = '';
@@ -1508,6 +1608,7 @@ async function testConnection() {
       body: JSON.stringify({fields}),
     });
     const d = await r.json();
+    const hint = document.getElementById('ip-restrict-hint');
     if (d.ok) {
       const b = d.balance;
       setChip('ci-exchange', `✅ ${d.exchange}`, 'ok');
@@ -1515,6 +1616,7 @@ async function testConnection() {
       setChip('ci-mode',     d.pos_mode === 'paper' ? '📋 Paper' : d.pos_mode, 'ok');
       markTest('connection', true);
       showToast('✅ Connection successful', 'ok');
+      if (hint) hint.style.display = 'none';
       if (d.coins) renderCoins(d.coins, d.stbc);
     } else {
       setChip('ci-exchange', '❌ ' + d.error, 'fail');
@@ -1522,6 +1624,9 @@ async function testConnection() {
       setChip('ci-mode',     '—');
       markTest('connection', false);
       showToast('❌ Connection failed', 'fail');
+      // Show IP restriction hint when connection fails in trade mode (keys may be IP-restricted)
+      const mode = getRadioValue('MODE') || 'paper';
+      if (hint) hint.style.display = (mode === 'trade') ? 'block' : 'none';
     }
   } catch(e) {
     setChip('ci-exchange', '❌ ' + e.message, 'fail');

@@ -74,6 +74,8 @@ class AgentConfig:
     parser_mode:            str   = "regex"  # regex | llm
     confirm_trade:          bool  = True     # ask confirmation before executing parsed signal
     default_sl_pct:         float = 2.0      # default SL % when not specified in signal
+    default_tp_pct:         float = 5.0      # default TP % when not specified in signal (0 = disabled)
+    trailing_stop:          bool  = False    # tighten SL as profit grows
 
     # LLM settings
     llm_provider:           str   = "none"   # none | claude
@@ -124,6 +126,8 @@ def load_config() -> AgentConfig:
         parser_mode             = (os.getenv("PARSER_MODE") or "regex").lower().strip(),
         confirm_trade           = os.getenv("CONFIRM_TRADE", "true").lower() != "false",
         default_sl_pct          = float(os.getenv("DEFAULT_SL_PCT", "2.0")),
+        default_tp_pct          = float(os.getenv("DEFAULT_TP_PCT", "5.0")),
+        trailing_stop           = os.getenv("TRAILING_STOP", "false").lower() != "false",
         llm_provider            = (os.getenv("LLM_PROVIDER") or "none").lower().strip(),
         llm_api_key             = os.getenv("LLM_API_KEY", ""),
         llm_model               = os.getenv("LLM_MODEL", ""),

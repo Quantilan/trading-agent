@@ -231,7 +231,7 @@ async def check_diff(req: SaveRequest):
 
     _NUMERIC_KEYS = {
         "MARGIN_PCT", "LEVERAGE", "MAX_POSITIONS",
-        "PAPER_BALANCE", "DEFAULT_SL_PCT", "CHART_BARS",
+        "PAPER_BALANCE", "DEFAULT_SL_PCT", "DEFAULT_TP_PCT", "CHART_BARS",
     }
 
     def _norm(key: str, val: str) -> str:

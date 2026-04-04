@@ -29,5 +29,4 @@ agent_state.json
 # Lock files (using requirements.txt in Docker)
 uv.lock
 
-# Tests
-tests/
+# Tests are needed by GUI order test — included in image

@@ -11,7 +11,8 @@
 #  make rebuild   — rebuild from scratch (after requirements.txt changes)
 #  make clean     — remove containers and image
 
-COMPOSE = docker compose
+# Auto-detect: use sudo docker compose if current user can't reach Docker socket
+COMPOSE = $(shell docker info >/dev/null 2>&1 && echo "docker compose" || echo "sudo docker compose")
 
 .PHONY: setup gui start stop restart logs status build clean
 
