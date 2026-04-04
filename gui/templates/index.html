@@ -821,6 +821,7 @@ input[type=range]::-webkit-slider-thumb {
             <div class="field">
               <label>LLM Provider</label>
               <select id="LLM_PROVIDER">
+                <option value="none">None (disabled)</option>
                 <option value="claude">Claude (Anthropic)</option>
               </select>
             </div>
@@ -1393,7 +1394,7 @@ function collectFields() {
     SIGNAL_SERVER:          el('SIGNAL_SERVER'),
     PARSER_MODE:            el('PARSER_MODE'),
     CONFIRM_TRADE:          document.getElementById('CONFIRM_TRADE').checked ? 'true' : 'false',
-    LLM_PROVIDER:           el('LLM_PROVIDER'),
+    LLM_PROVIDER:           el('PARSER_MODE') === 'llm' ? (el('LLM_PROVIDER') || 'none') : 'none',
     LLM_API_KEY:  el('LLM_API_KEY'),
     LLM_MODEL:    el('LLM_MODEL'),
     CHART_TF:     el('CHART_TF')   || '15m',

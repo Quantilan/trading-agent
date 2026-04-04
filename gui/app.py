@@ -176,6 +176,9 @@ class _QueueLogHandler(logging.Handler):
         self.queue = queue
         self.setFormatter(logging.Formatter("%(message)s"))
 
+    # Prevents setup_logging() from removing this handler when it clears root handlers
+    _preserve = True
+
     def emit(self, record: logging.LogRecord):
         msg = self.format(record)
         # Strip ANSI codes if any
@@ -245,6 +248,10 @@ async def check_diff(req: SaveRequest):
 
     changed = []
     for key in existing:
+        # Skip fields that the form doesn't manage — they keep their saved/default value
+        if key not in fields:
+            continue
+
         new_val = (fields.get(key) or "").strip()
         old_val = (existing.get(key) or "").strip()
 

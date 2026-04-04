@@ -3,10 +3,10 @@
 **Autonomous Crypto Trading Agent That Runs on Your Infrastructure**
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![Version](https://img.shields.io/badge/version-1.0.0-success)](#)
+[![Version](https://img.shields.io/badge/version-1.1.0-success)](#)
 [![License: BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-orange.svg)](LICENSE)
 
-> ⚡ **v1.0.0 — stable release**
+> ⚡ **v1.1.0** — trailing stop, default TP, GUI improvements, Docker fixes
 
 ---
 
@@ -293,6 +293,8 @@ SIGNAL_SERVER=wss://signals.quantilan.com
 PARSER_MODE=regex         # regex | llm
 CONFIRM_TRADE=true
 DEFAULT_SL_PCT=2.0        # fallback SL when not in signal
+DEFAULT_TP_PCT=5.0        # fallback TP when not in signal (0 = disabled)
+TRAILING_STOP=false       # tighten SL as profit grows (off by default — use with own signals)
 
 # ── Entry zone (deferred entries) ──────────────────────────
 ENTRY_TOLERANCE=0.1       # ±% tolerance around entry zone
@@ -424,6 +426,8 @@ Get a license key: [@quantilan_bot](https://t.me/quantilan_bot)
 - [x] P&L image report via /positions
 - [x] Browser-based Setup GUI with live connection tests
 - [x] Docker Compose deployment
+- [x] Trailing stop — auto-tightens SL as profit grows
+- [x] Default take-profit % — fallback TP when not in signal
 - [ ] Strategy marketplace
 
 ---

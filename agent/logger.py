@@ -59,8 +59,13 @@ def setup_logging(
     root = logging.getLogger()
     root.setLevel(logging.DEBUG)   # root captures everything; handlers filter
 
-    # Remove existing handlers to avoid duplicates on re-call
-    root.handlers.clear()
+    # Remove existing console/file handlers to avoid duplicates on re-call,
+    # but preserve any custom handlers (e.g. GUI queue handler for live log streaming).
+    root.handlers = [
+        h for h in root.handlers
+        if not isinstance(h, (logging.StreamHandler, RotatingFileHandler))
+        or getattr(h, '_preserve', False)
+    ]
 
     # ── Console handler ───────────────────────────────────
     console = logging.StreamHandler(sys.stdout)
