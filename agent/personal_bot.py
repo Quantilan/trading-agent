@@ -19,11 +19,13 @@ Commands:
 
 import asyncio
 import logging
+import ssl
 import time
 import uuid
 from typing import Optional, TYPE_CHECKING
 
 import aiohttp
+import certifi
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.filters import Command
@@ -56,11 +58,11 @@ class PersonalBot:
         self.owner_chat_id = owner_chat_id
         self.agent         = agent
 
-        # Inject ThreadedResolver to bypass broken aiodns on Windows.
-        # AiohttpSession builds its own TCPConnector from _connector_init dict,
-        # so we add 'resolver' there before the first request is made.
+        # Inject ThreadedResolver + certifi SSL context to fix SSL errors
+        # on systems with outdated/missing CA certificates (common on fresh VPS).
         _tg_session = AiohttpSession()
         _tg_session._connector_init['resolver'] = aiohttp.ThreadedResolver()
+        _tg_session._connector_init['ssl'] = ssl.create_default_context(cafile=certifi.where())
         self.bot = Bot(token=token, session=_tg_session)
         self.dp  = Dispatcher()
 

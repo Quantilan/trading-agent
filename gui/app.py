@@ -483,8 +483,10 @@ async def test_telegram(req: TestTelegramRequest):
         if not token or not chat_id:
             return {"ok": False, "error": "Token or chat_id is empty"}
 
+        import ssl, certifi
         url = f"https://api.telegram.org/bot{token}/sendMessage"
-        connector = aiohttp.TCPConnector(resolver=aiohttp.ThreadedResolver())
+        ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+        connector = aiohttp.TCPConnector(ssl=ssl_ctx, resolver=aiohttp.ThreadedResolver())
         async with aiohttp.ClientSession(connector=connector) as session:
             # First: get bot info
             async with session.get(f"https://api.telegram.org/bot{token}/getMe") as r:
@@ -503,7 +505,13 @@ async def test_telegram(req: TestTelegramRequest):
                 if resp.get("ok"):
                     return {"ok": True, "bot_name": bot_name, "chat_id": chat_id}
                 else:
-                    return {"ok": False, "error": resp.get("description", "Unknown error")}
+                    desc = resp.get("description", "Unknown error")
+                    if "chat not found" in desc.lower():
+                        desc = (
+                            "Chat not found — open your bot in Telegram and press Start first. "
+                            "Find your bot by username and send /start, then retry this test."
+                        )
+                    return {"ok": False, "error": desc}
 
     except Exception as e:
         return {"ok": False, "error": str(e)}

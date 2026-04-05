@@ -7,6 +7,21 @@ echo(  Trading Agent - Launcher
 echo(====================================
 echo(
 
+:: Check Python is installed
+python --version >nul 2>&1
+if %ERRORLEVEL% NEQ 0 (
+    echo([ERROR] Python not found!
+    echo(
+    echo(  Python 3.11 or newer is required.
+    echo(  Download it from: https://www.python.org/downloads/
+    echo(
+    echo(  IMPORTANT: During installation, check the box:
+    echo(    "Add Python to PATH"
+    echo(
+    pause
+    exit /b 1
+)
+
 :: Check install
 if exist .installed (
     echo([OK] Dependencies already installed.
