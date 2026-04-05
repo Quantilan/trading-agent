@@ -7,6 +7,7 @@
 [![License: BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-orange.svg)](LICENSE)
 
 > ⚡ **v1.3.0** — Groq LLM provider (free), parser diagnostics, 34 parser tests, coins list in /help
+> 🔧 **Requires `make rebuild`** — dependencies updated (`groq`, `pytest-asyncio`)
 
 ---
 
