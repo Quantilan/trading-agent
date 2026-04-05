@@ -3,10 +3,10 @@
 **Autonomous Crypto Trading Agent That Runs on Your Infrastructure**
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![Version](https://img.shields.io/badge/version-1.2.0-success)](#)
+[![Version](https://img.shields.io/badge/version-1.3.0-success)](#)
 [![License: BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-orange.svg)](LICENSE)
 
-> ⚡ **v1.2.0** — sl/tp shorthand parsing (`sl: 1% tp: 3%`), parser tests
+> ⚡ **v1.3.0** — Groq LLM provider (free), parser diagnostics, 34 parser tests, coins list in /help
 
 ---
 
