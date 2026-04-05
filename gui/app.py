@@ -303,9 +303,25 @@ async def test_connection(req: TestConnectionRequest):
         config   = _build_config(fields)
         executor = OrderExecutor(config)
 
-        ok = await executor.connect()
+        # Capture log output so the real error message reaches the GUI
+        _captured_logs: list[str] = []
+
+        class _CaptureHandler(logging.Handler):
+            def emit(self, record: logging.LogRecord):
+                _captured_logs.append(self.format(record))
+
+        _cap = _CaptureHandler()
+        _cap.setFormatter(logging.Formatter("%(message)s"))
+        _root_logger = logging.getLogger()
+        _root_logger.addHandler(_cap)
+        try:
+            ok = await executor.connect()
+        finally:
+            _root_logger.removeHandler(_cap)
+
         if not ok:
-            return {"ok": False, "error": f"connect() returned False — check logs for [{config.exchange.upper()}] error details"}
+            detail = " | ".join(_captured_logs[-3:]) if _captured_logs else "no details"
+            return {"ok": False, "error": detail}
 
         stbc = config.stbc or "USDT"
 
