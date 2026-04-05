@@ -820,19 +820,21 @@ input[type=range]::-webkit-slider-thumb {
           <div id="llm-fields" style="display:none; margin-top:2px">
             <div class="field">
               <label>LLM Provider</label>
-              <select id="LLM_PROVIDER">
+              <select id="LLM_PROVIDER" onchange="onLLMProviderChange()">
                 <option value="none">None (disabled)</option>
+                <option value="groq">Groq — free tier (Llama 3.3)</option>
                 <option value="claude">Claude (Anthropic)</option>
               </select>
             </div>
             <div class="field">
               <label>API Key <span class="status-dot empty" id="s-LLM_API_KEY"></span></label>
-              <input type="password" id="LLM_API_KEY" placeholder="sk-ant-..." oninput="onSecretInput('LLM_API_KEY')">
+              <input type="password" id="LLM_API_KEY" placeholder="API key..." oninput="onSecretInput('LLM_API_KEY')">
             </div>
             <div class="field">
               <label>Model <span style="color:var(--muted);font-weight:400">(optional)</span></label>
-              <input type="text" id="LLM_MODEL" placeholder="auto: claude-haiku-4-5">
+              <input type="text" id="LLM_MODEL" placeholder="auto">
             </div>
+            <div id="llm-provider-hint" style="font-size:0.8rem;color:var(--muted);margin-top:4px;padding-left:2px"></div>
           </div>
 
           <div class="field" style="margin-top:10px">
@@ -1269,6 +1271,23 @@ function onParserModeChange() {
   const v = document.getElementById('PARSER_MODE') ? document.getElementById('PARSER_MODE').value : 'regex';
   const llm = document.getElementById('llm-fields');
   if (llm) llm.style.display = v === 'llm' ? 'block' : 'none';
+  onLLMProviderChange();
+}
+
+function onLLMProviderChange() {
+  const provider = (document.getElementById('LLM_PROVIDER') || {}).value || 'none';
+  const keyInput = document.getElementById('LLM_API_KEY');
+  const modelInput = document.getElementById('LLM_MODEL');
+  const hint = document.getElementById('llm-provider-hint');
+  const hints = {
+    groq:   { key: 'gsk_...', model: 'auto: llama-3.3-70b-versatile', text: '🆓 Free tier — get a key at <a href="https://console.groq.com" target="_blank" style="color:var(--accent)">console.groq.com</a>' },
+    claude: { key: 'sk-ant-...', model: 'auto: claude-haiku-4-5', text: 'Paid — get a key at <a href="https://console.anthropic.com" target="_blank" style="color:var(--accent)">console.anthropic.com</a>' },
+    none:   { key: 'API key...', model: 'auto', text: '' },
+  };
+  const h = hints[provider] || hints.none;
+  if (keyInput)   keyInput.placeholder   = h.key;
+  if (modelInput) modelInput.placeholder = h.model;
+  if (hint)       hint.innerHTML         = h.text;
 }
 
 // ── Radio buttons ────────────────────────────────────────────────────────────

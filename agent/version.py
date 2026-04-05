@@ -2,10 +2,10 @@
 Quantilan Trading Agent - Version Information
 """
 
-VERSION = "1.3.1"
+VERSION = "1.3.2"
 VERSION_MAJOR = 1
 VERSION_MINOR = 3
-VERSION_PATCH = 1
+VERSION_PATCH = 2
 
 # Optional: build metadata
 BUILD_DATE = "2026-04-05"
