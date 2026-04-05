@@ -262,7 +262,7 @@ class TradingAgent:
             result_emoji = "✅" if pos.rpnl >= 0 else "❌"
             brief = f"{result_emoji} <b>{base} closed</b> | rPnL: {pos.rpnl:+.2f}$ — 📊 fetching chart..."
         else:  # modify_sl
-            brief = f"🟧 <b>{base}</b> SL → {pos.stop_price} — 📊 fetching chart..."
+            brief = f"🟧 <b>{base} MODIFY SL</b> → {pos.stop_price} — 📊 fetching chart..."
         try:
             await self._notify(brief)
         except Exception as e:

@@ -15,10 +15,14 @@ Caption structure:
 """
 
 import logging
+import ssl
 from datetime import datetime, timezone
 from typing import Optional
 
 import aiohttp
+import certifi
+
+_SSL_CTX = ssl.create_default_context(cafile=certifi.where())
 
 from .state import Position, PositionSide, PositionStatus
 
@@ -119,7 +123,7 @@ class Notifier:
 
         lines = [
             self._header(base),
-            f"🟧 <b>{pos.side.value} modify SL</b>",
+            f"🟧 <b>{pos.side.value} MODIFY SL</b>",
             f"SL: <b>{pos.stop_price}</b>",
         ]
 
@@ -218,7 +222,7 @@ class Notifier:
             data.add_field('photo', image_bytes,
                            filename='chart.png', content_type='image/png')
 
-            connector = aiohttp.TCPConnector(resolver=aiohttp.ThreadedResolver())
+            connector = aiohttp.TCPConnector(ssl=_SSL_CTX, resolver=aiohttp.ThreadedResolver())
             async with aiohttp.ClientSession(connector=connector) as session:
                 async with session.post(url, data=data,
                                         timeout=aiohttp.ClientTimeout(total=20)) as resp:
@@ -234,7 +238,7 @@ class Notifier:
         try:
             url     = TELEGRAM_MSG_API.format(token=self.token)
             payload = {'chat_id': self.chat_id, 'text': text, 'parse_mode': 'HTML'}
-            connector = aiohttp.TCPConnector(resolver=aiohttp.ThreadedResolver())
+            connector = aiohttp.TCPConnector(ssl=_SSL_CTX, resolver=aiohttp.ThreadedResolver())
             async with aiohttp.ClientSession(connector=connector) as session:
                 async with session.post(url, json=payload,
                                         timeout=aiohttp.ClientTimeout(total=10)) as resp:

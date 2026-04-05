@@ -3,9 +3,11 @@
 **Autonomous Crypto Trading Agent That Runs on Your Infrastructure**
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![Version](https://img.shields.io/badge/version-1.3.4-success)](#)
+[![Version](https://img.shields.io/badge/version-1.3.6-success)](#)
 [![License: BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-orange.svg)](LICENSE)
 
+> ⚡ **v1.3.6** — SSL fix in notifier, "MODIFY SL" label in notifications
+> ⚡ **v1.3.5** — SSL fix in notifier (sendPhoto/sendMessage via certifi)
 > ⚡ **v1.3.4** — SSL fix for Telegram on VPS (certifi), Python check in start.bat, chat-not-found hint
 > ⚡ **v1.3.3** — start.bat Python check, Telegram "chat not found" hint
 > ⚡ **v1.3.2** — Groq provider in Setup GUI with free-tier hint
