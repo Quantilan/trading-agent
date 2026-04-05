@@ -141,16 +141,36 @@ class Notifier:
         await self._send_text(f"⛔️ <b>AGENT ERROR</b>\n{message}")
 
     async def on_start(self, exchange: str, mode: str, balance: float,
+                       stbc: str = "USDT", signal_source: str = "telegram",
+                       license=None,
                        positions: list = None, stats: dict = None) -> None:
         if not self.enabled:
             return
+        import datetime
         from agent.version import VERSION, BUILD_DATE
         mode_emoji = "📋" if mode == "paper" else "💰"
+
+        # Signal source line
+        if signal_source == "server" and license is not None:
+            plan = (license.plan or "").upper()
+            if license.expires_at:
+                until = datetime.datetime.fromtimestamp(license.expires_at).strftime("%Y-%m-%d")
+            else:
+                until = "—"
+            plan_str = f" · {plan}" if plan else ""
+            signal_line = f"📡 Signal:   QUANTILAN SERVER{plan_str} · until {until}"
+        elif signal_source == "tradingview":
+            signal_line = "📡 Signal:   TRADINGVIEW WEBHOOK"
+        else:
+            signal_line = "📡 Signal:   TELEGRAM"
+
         lines = [
             f"🚀 <b>Agent started</b>\n",
-            f"Exchange: {exchange.upper()}",
-            f"Mode:     {mode_emoji} {mode.upper()}",
-            f"Balance:  {balance:.2f}$",
+            f"Exchange: <b>{exchange.upper()}</b>",
+            f"Mode:     <b>{mode_emoji} {mode.upper()}</b>",
+            f"Stable:   <b>{stbc}</b>",
+            signal_line,
+            f"\n💰 Balance:  <b>{balance:.2f}$</b>",
             f"Version:  v{VERSION} ({BUILD_DATE})",
         ]
 

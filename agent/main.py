@@ -159,6 +159,9 @@ class TradingAgent:
         # 5. Notify start
         await self.notifier.on_start(
             self.config.exchange, self.config.mode, total,
+            stbc=self.config.stbc or "USDT",
+            signal_source=self.config.signal_source,
+            license=self.license if self.config.signal_source == "server" else None,
             positions=self.state.get_open_positions(self.config.mode),
             stats=self.state.get_pnl_stats(self.config.mode),
         )
