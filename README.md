@@ -21,6 +21,9 @@
 
 ### 🪟 Quick Start on Windows
 
+> **Python 3.11+ is required.** Windows doesn't include Python by default.  
+> Download it from **https://www.python.org/downloads/** — during installation check **"Add Python to PATH"**.
+
 1. Download ZIP:  
    👉 https://github.com/Quantilan/trading-agent/archive/refs/heads/main.zip
 
