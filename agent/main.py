@@ -338,6 +338,15 @@ class TradingAgent:
             if self.config.signal_source == "server":
                 raw = getattr(signal, '_raw', None)
                 if raw and raw.get("sig"):
+                    # Plan check: skip signals from strategies not in this license
+                    signal_strategy = raw.get("strategy", "")
+                    agent_plan      = (self.license.plan or "").lower()
+                    if signal_strategy and agent_plan and signal_strategy.lower() not in agent_plan:
+                        logger.info(
+                            f"⏭ Signal strategy '{signal_strategy}' not in plan '{agent_plan}' — skipped"
+                        )
+                        continue
+
                     # Race condition recovery: if hub rotated key between our last
                     # fetch and now, signal.kid won't match our cached kid.
                     # Re-fetch the correct key from server before verifying.

@@ -60,7 +60,9 @@ class PersonalBot:
 
         # Inject ThreadedResolver + certifi SSL context to fix SSL errors
         # on systems with outdated/missing CA certificates (common on fresh VPS).
-        _tg_session = AiohttpSession()
+        _tg_session = AiohttpSession(
+            timeout=aiohttp.ClientTimeout(total=60, connect=10, sock_connect=10),
+        )
         _tg_session._connector_init['resolver'] = aiohttp.ThreadedResolver()
         _tg_session._connector_init['ssl'] = ssl.create_default_context(cafile=certifi.where())
         self.bot = Bot(token=token, session=_tg_session)
@@ -1072,7 +1074,7 @@ class PersonalBot:
         await self.bot.delete_webhook(drop_pending_updates=True)
         await self._set_commands()
         logger.info(f"🤖 [PersonalBot] Started for chat_id {self.owner_chat_id}")
-        await self.dp.start_polling(self.bot)
+        await self.dp.start_polling(self.bot, polling_timeout=20, handle_signals=False)
 
     async def stop(self) -> None:
         await self.bot.session.close()
