@@ -235,6 +235,9 @@ class PersonalBot:
         ac_status  = "ON ⚡" if self.agent.state.state.auto_confirm else "OFF"
         mode       = self.agent.config.mode
         mode_badge = "📋 PAPER" if mode == "paper" else "💰 TRADE"
+        coins = load_coins_list()
+        coins_line = " · ".join(coins)
+
         await message.answer(
             f"📖 <b>Commands</b>  [{mode_badge}]\n\n"
             "/start         — agent status\n"
@@ -253,7 +256,9 @@ class PersonalBot:
             "  <code>buy sol short sl 2% tp 5%</code>\n"
             "  <code>закрой биток</code>\n"
             "  <code>стоп на 1800</code>  — move SL\n"
-            "  <code>тейк на 3500</code>  — move TP",
+            "  <code>тейк на 3500</code>  — move TP\n\n"
+            f"📋 <b>Supported coins</b> ({len(coins)})\n"
+            f"<i>{coins_line}</i>",
             parse_mode=ParseMode.HTML
         )
 
