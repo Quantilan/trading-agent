@@ -28,7 +28,10 @@ import time
 from pathlib import Path
 from typing import Optional, Tuple
 
+import ssl
+
 import aiohttp
+import certifi
 import ccxt.async_support as ccxt
 
 try:
@@ -48,15 +51,17 @@ _HL_MARKETS_CACHE = Path(__file__).parent.parent / ".cache" / "hl_markets.json"
 _HL_CACHE_TTL     = 3600  # seconds — refresh markets if older than this
 
 
+_SSL_CTX = ssl.create_default_context(cafile=certifi.where())
+
+
 def _make_session() -> aiohttp.ClientSession:
     """
-    Create an aiohttp session with ThreadedResolver.
+    Create an aiohttp session with ThreadedResolver + certifi SSL context.
 
-    When aiodns is installed aiohttp uses it by default, but c-ares (aiodns)
-    sometimes fails DNS resolution on Windows while the standard socket resolver works.
-    ThreadedResolver calls socket.getaddrinfo in a thread pool — same path as curl.
+    ThreadedResolver: avoids broken aiodns/c-ares DNS on Windows and some Linux VPS.
+    certifi SSL: fixes SSLCertVerificationError on VPS with outdated system CA store.
     """
-    connector = aiohttp.TCPConnector(resolver=aiohttp.ThreadedResolver())
+    connector = aiohttp.TCPConnector(ssl=_SSL_CTX, resolver=aiohttp.ThreadedResolver())
     return aiohttp.ClientSession(connector=connector)
 
 
