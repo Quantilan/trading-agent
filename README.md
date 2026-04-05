@@ -3,11 +3,12 @@
 **Autonomous Crypto Trading Agent That Runs on Your Infrastructure**
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![Version](https://img.shields.io/badge/version-1.3.0-success)](#)
+[![Version](https://img.shields.io/badge/version-1.3.1-success)](#)
 [![License: BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-orange.svg)](LICENSE)
 
+> ⚡ **v1.3.1** — stablecoin shown in /start, coins hint in /help, patch bump
 > ⚡ **v1.3.0** — Groq LLM provider (free), parser diagnostics, 34 parser tests, coins list in /help
-> 🔧 **Requires `make rebuild`** — dependencies updated (`groq`, `pytest-asyncio`)
+> 🔧 **v1.3.0 requires `make rebuild`** — dependencies updated (`groq`, `pytest-asyncio`)
 
 ---
 

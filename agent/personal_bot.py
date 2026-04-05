@@ -217,11 +217,13 @@ class PersonalBot:
         positions      = state.get_open_positions(mode=ag.config.mode)
         total_pnl      = state.total_realized_pnl
 
+        stbc = ag.config.stbc or "USDT"
         text = (
             f"🤖 <b>Quantilan Agent</b>\n\n"
             f"Status:   <b>{trading_status}</b>\n"
             f"Exchange: <b>{ag.config.exchange.upper()}</b>\n"
-            f"Mode:     <b>{ag.config.mode.upper()}</b>\n\n"
+            f"Mode:     <b>{ag.config.mode.upper()}</b>\n"
+            f"Stable:   <b>{stbc}</b>\n\n"
             f"💰 Balance:   <b>${balance:.2f}</b>\n"
             f"📊 Positions: <b>{len(positions)}</b>\n"
             f"📈 Total P&L: <b>${total_pnl:+.2f}</b>\n\n"
@@ -257,8 +259,9 @@ class PersonalBot:
             "  <code>закрой биток</code>\n"
             "  <code>стоп на 1800</code>  — move SL\n"
             "  <code>тейк на 3500</code>  — move TP\n\n"
-            f"📋 <b>Supported coins</b> ({len(coins)})\n"
-            f"<i>{coins_line}</i>",
+            f"📋 <b>Supported coins</b> ({len(coins)})\n\n"
+            f"<i>{coins_line}</i>\n\n"
+            f"To add a coin — edit <code>coins.json</code> in the agent folder and restart.",
             parse_mode=ParseMode.HTML
         )
 
