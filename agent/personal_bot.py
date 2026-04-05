@@ -60,9 +60,7 @@ class PersonalBot:
 
         # Inject ThreadedResolver + certifi SSL context to fix SSL errors
         # on systems with outdated/missing CA certificates (common on fresh VPS).
-        _tg_session = AiohttpSession(
-            timeout=aiohttp.ClientTimeout(total=60, connect=10, sock_connect=10),
-        )
+        _tg_session = AiohttpSession(timeout=60)
         _tg_session._connector_init['resolver'] = aiohttp.ThreadedResolver()
         _tg_session._connector_init['ssl'] = ssl.create_default_context(cafile=certifi.where())
         self.bot = Bot(token=token, session=_tg_session)
