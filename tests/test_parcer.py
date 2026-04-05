@@ -143,6 +143,36 @@ def test_sl_shorthand_space_no_colon(parser):
     assert signal.tp_pct == pytest.approx(0.05)
 
 
+# ── diagnose() tests ─────────────────────────────────────────────────────────
+
+def test_diagnose_no_action(parser):
+    """Random text → 'command not recognized'."""
+    msg = parser.diagnose("привет, как дела?")
+    assert "not recognized" in msg.lower()
+    assert "/help" in msg
+
+
+def test_diagnose_unknown_coin(parser):
+    """Known action + unknown coin → mentions the candidate coin."""
+    msg = parser.diagnose("long PEPE sl 5%")
+    assert "PEPE" in msg
+    assert "coins.json" in msg
+
+
+def test_diagnose_action_no_coin(parser):
+    """Action keyword present but no coin at all → generic hint."""
+    msg = parser.diagnose("long sl 2%")
+    # Should mention the action and suggest /help
+    assert "/help" in msg or "coin" in msg.lower() or "монет" in msg.lower()
+
+
+def test_diagnose_returns_string_always(parser):
+    """diagnose() never returns None — always a non-empty string."""
+    for text in ["", "??", "hello", "buy sl 2", "long UNKNOWNCOIN"]:
+        result = parser.diagnose(text)
+        assert isinstance(result, str) and len(result) > 0
+
+
 # ── Additional regex tests ────────────────────────────────────────────────────
 
 def test_flat_close_signal(parser):

@@ -638,7 +638,9 @@ class PersonalBot:
 
         signal = await self._parse_text(text)
         if not signal:
-            return  # not a trading command — ignore silently
+            feedback = self._regex_parser.diagnose(text)
+            await message.answer(feedback, parse_mode=ParseMode.HTML)
+            return
 
         # Resolve empty symbol for modify actions (use single open position)
         if not signal.symbol and signal.action in ("MODIFY_SL", "MODIFY_TP"):

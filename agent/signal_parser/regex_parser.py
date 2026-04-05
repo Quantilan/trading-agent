@@ -151,6 +151,61 @@ class RegexParser:
         
         return signal
 
+    def diagnose(self, text: str) -> str:
+        """
+        Explain why parse() returned None. Always returns a non-empty string.
+
+        No action detected  → "command not recognized" + /help reference.
+        Action but no coin  → specific hint about the missing/unsupported symbol.
+        Partial match       → summary of what was and wasn't understood.
+        """
+        t = text.lower().strip()
+        action = self._detect_action(t)
+
+        if not action:
+            return (
+                "❓ <b>Command not recognized.</b>\n\n"
+                "Use /help to see supported commands and examples."
+            )
+
+        symbol = self._detect_symbol(t)
+
+        if action in ("open", "close") and not symbol:
+            # Try to spot an unrecognised ticker: #COIN, $COIN, or bare UPPERCASE word
+            _SKIP = {"LONG", "SHORT", "BUY", "SELL", "STOP", "TAKE", "CLOSE",
+                     "OPEN", "SL", "TP", "THE", "FOR", "AND", "IN", "ON", "AT"}
+            candidate = None
+            for m in re.finditer(r'(?:#|\$)?([A-Za-z]{2,6})\b', text):
+                w = m.group(1).upper()
+                if w not in _SKIP:
+                    candidate = w
+                    break
+
+            action_label = {"open": "LONG/SHORT", "close": "FLAT"}.get(action, action.upper())
+
+            if candidate:
+                return (
+                    f"❓ Understood: <b>{action_label}</b>, "
+                    f"but coin <b>{candidate}</b> is not in the supported list.\n\n"
+                    f"To add it — edit <code>coins.json</code> and restart the agent."
+                )
+            else:
+                return (
+                    f"❓ Understood: <b>{action_label}</b>, but no coin found.\n\n"
+                    "Use /help to see command examples."
+                )
+
+        # Action + symbol found but parse still returned None — shouldn't normally happen
+        action_label = {
+            "open": "LONG/SHORT", "close": "FLAT",
+            "modify_sl": "MODIFY_SL", "modify_tp": "MODIFY_TP",
+        }.get(action, action.upper())
+        return (
+            f"❓ Partially recognized: <b>{action_label}</b>"
+            + (f" <b>{symbol}</b>" if symbol else "")
+            + ".\n\nCould not extract all required fields. Use /help for examples."
+        )
+
     # ─────────────────────────────────────────
     # DETECTION HELPERS
     # ─────────────────────────────────────────
