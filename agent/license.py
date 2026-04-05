@@ -38,6 +38,7 @@ class LicenseChecker:
         self.check_interval = check_interval
         self.is_valid       = False
         self.expires_at:    Optional[int] = None
+        self.plan:          Optional[str] = None
         self._last_check:   int = 0
         self._fingerprint   = get_device_fingerprint()
 
@@ -67,6 +68,7 @@ class LicenseChecker:
                     if resp.status == 200 and data.get("valid"):
                         self.is_valid    = True
                         self.expires_at  = data.get("expires_at")
+                        self.plan        = data.get("plan")
                         self._last_check = int(time.time())
                         logger.info("✅ [License] Valid")
                         return True

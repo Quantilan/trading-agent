@@ -220,12 +220,31 @@ class PersonalBot:
         total_pnl      = state.total_realized_pnl
 
         stbc = ag.config.stbc or "USDT"
+
+        # Signal source line
+        src = ag.config.signal_source  # "telegram" | "server" | "tradingview"
+        if src == "server":
+            lic = getattr(ag, "license", None)
+            plan = (lic.plan or "").upper() if lic else ""
+            if lic and lic.expires_at:
+                import datetime
+                until = datetime.datetime.fromtimestamp(lic.expires_at).strftime("%Y-%m-%d")
+            else:
+                until = "—"
+            plan_str = f" · {plan}" if plan else ""
+            signal_line = f"📡 Signal:   <b>QUANTILAN SERVER</b>{plan_str} · until {until}\n"
+        elif src == "tradingview":
+            signal_line = "📡 Signal:   <b>TRADINGVIEW WEBHOOK</b>\n"
+        else:
+            signal_line = "📡 Signal:   <b>TELEGRAM</b>\n"
+
         text = (
             f"🤖 <b>Quantilan Agent</b>\n\n"
             f"Status:   <b>{trading_status}</b>\n"
             f"Exchange: <b>{ag.config.exchange.upper()}</b>\n"
             f"Mode:     <b>{ag.config.mode.upper()}</b>\n"
-            f"Stable:   <b>{stbc}</b>\n\n"
+            f"Stable:   <b>{stbc}</b>\n"
+            f"{signal_line}\n"
             f"💰 Balance:   <b>${balance:.2f}</b>\n"
             f"📊 Positions: <b>{len(positions)}</b>\n"
             f"📈 Total P&L: <b>${total_pnl:+.2f}</b>\n\n"
