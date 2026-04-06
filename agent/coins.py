@@ -130,7 +130,9 @@ def build_registry(
             # Log similar market keys to diagnose wrong symbol_map
             hint = [k for k in markets if coin.lower() in k.lower() or exchange_coin.lower() in k.lower()]
             if hint:
-                logger.debug(f"[Coins] {coin} not found as '{ms}' — similar markets: {hint[:5]}")
+                logger.warning(f"[Coins] {coin} not found as '{ms}' — similar markets: {hint[:5]}")
+            else:
+                logger.warning(f"[Coins] {coin} not found as '{ms}' — no similar keys in markets at all")
             registry[coin] = CoinInfo(
                 symbol        = coin,
                 market_symbol = ms,
