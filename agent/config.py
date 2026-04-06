@@ -88,7 +88,7 @@ class AgentConfig:
 
     # Entry tolerance for deferred entries
     entry_tolerance:        float = 0.1   # % tolerance for price matching (0.1 = 0.1%)
-    pending_entry_timeout:  int   = 24    # hours before pending entry is cancelled
+    pending_entry_timeout:  int   = 5     # minutes before pending entry is cancelled
 
     # Internal
     license_check_interval: int = 21600  # seconds (6 hours)
@@ -135,7 +135,7 @@ def load_config() -> AgentConfig:
         chart_bars  = max(25, min(100, int(os.getenv("CHART_BARS", "50") or "50"))),
         log_level               = os.getenv("LOG_LEVEL", "INFO").upper(),
         entry_tolerance         = float(os.getenv("ENTRY_TOLERANCE", "0.1")),
-        pending_entry_timeout   = int(os.getenv("PENDING_ENTRY_TIMEOUT", "24")),
+        pending_entry_timeout   = int(os.getenv("PENDING_ENTRY_TIMEOUT", "5")),
     )
 
     _validate(cfg)

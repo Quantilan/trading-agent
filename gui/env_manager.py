@@ -48,7 +48,7 @@ ENV_DEFAULTS: Dict[str, str] = {
     "CHART_TF":               "15m",
     "CHART_BARS":             "50",
     "ENTRY_TOLERANCE":        "0.1",  # % tolerance for deferred entry price zone
-    "PENDING_ENTRY_TIMEOUT":  "24",   # hours before pending entry is cancelled
+    "PENDING_ENTRY_TIMEOUT":  "5",    # minutes before pending entry is cancelled
 }
 
 

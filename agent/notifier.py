@@ -61,9 +61,17 @@ class Notifier:
         paper  = " 📋 PAPER" if self.mode == "paper" else ""
         exlbl  = _EXCHANGE_LABELS.get(self.exchange, self.exchange.upper())
 
-        sl_tp = f"SL: {pos.stop_price}"
+        sl_line = f"SL: {pos.stop_price}  ({pos.sl_pct:.1f}%)"
+        tp_line = ""
+        rr_line = ""
         if pos.take_price > 0:
-            sl_tp += f"  |  TP: {pos.take_price}"
+            tp_label = "TP"
+            if pos.take_levels and len(pos.take_levels) > 1:
+                tp_label = f"TP1/{len(pos.take_levels)}"
+            tp_line = f"{tp_label}: {pos.take_price}  ({pos.tp_pct:.1f}%)"
+            if pos.sl_pct > 0:
+                rr = round(pos.tp_pct / pos.sl_pct, 1)
+                rr_line = f"RR: {rr} : 1"
 
         lines = [
             self._header(base),
@@ -71,9 +79,13 @@ class Notifier:
             f"isol x{pos.leverage} MARKET",
             f"Size: {pos.amount} {base}",
             f"price: {pos.entry_price}",
-            sl_tp,
-            f"mode: {self.mode}",
+            sl_line,
         ]
+        if tp_line:
+            lines.append(tp_line)
+        if rr_line:
+            lines.append(rr_line)
+        lines.append(f"mode: {self.mode}")
 
         if self.mode == "trade":
             lines.append("")

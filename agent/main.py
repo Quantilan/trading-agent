@@ -115,7 +115,7 @@ class TradingAgent:
             on_triggered      = self._on_deferred_entry_triggered,
             get_pro_exchange  = lambda: getattr(self.executor, 'pro_exchange', None),
             tolerance         = config.entry_tolerance / 100,
-            timeout_hours     = config.pending_entry_timeout,
+            timeout_minutes   = config.pending_entry_timeout,
         )
 
     # ─────────────────────────────────────
@@ -420,7 +420,7 @@ class TradingAgent:
             await self._notify(
                 f"⏳ <b>{signal.symbol} {signal.action}</b> — deferred entry\n"
                 f"Waiting for price zone: <b>{zone_str}</b>\n"
-                f"Tolerance: ±{self.config.entry_tolerance}%"
+                f"Tolerance: ±{self.config.entry_tolerance}% | Timeout: {self.config.pending_entry_timeout} min"
             )
             return
 

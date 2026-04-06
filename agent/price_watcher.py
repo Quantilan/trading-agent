@@ -50,13 +50,13 @@ class PriceWatcher:
         on_triggered: Callable[[Signal], Awaitable[None]],
         get_pro_exchange: Callable[[], Optional[object]],  # returns ccxt.pro instance or None
         tolerance:    float = 0.001,   # fraction e.g. 0.001 = 0.1%
-        timeout_hours: int  = 24,
+        timeout_minutes: int = 5,
     ):
         self._get_ticker      = get_ticker
         self._on_triggered    = on_triggered
         self._get_pro         = get_pro_exchange
         self._tolerance       = tolerance
-        self._timeout_sec     = timeout_hours * 3600
+        self._timeout_sec     = timeout_minutes * 60
         self._pending: Dict[str, PendingEntry] = {}
         self._running = False
         self._task:   Optional[asyncio.Task] = None
