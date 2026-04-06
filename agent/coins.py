@@ -37,6 +37,7 @@ class CoinInfo:
     min_notional:  float  # minimum order value in stablecoin
     max_amount:    float  # maximum single order amount (0 = exchange has no limit)
     max_leverage:  int    # maximum leverage allowed by exchange (0 = unknown/unlimited)
+    hint:          str = ""  # similar market keys found when coin is unavailable (diagnostic)
 
 
 def load_coins_list() -> List[str]:
@@ -127,12 +128,9 @@ def build_registry(
             )
             available += 1
         else:
-            # Log similar market keys to diagnose wrong symbol_map
-            hint = [k for k in markets if coin.lower() in k.lower() or exchange_coin.lower() in k.lower()]
-            if hint:
-                logger.warning(f"[Coins] {coin} not found as '{ms}' — similar markets: {hint[:5]}")
-            else:
-                logger.warning(f"[Coins] {coin} not found as '{ms}' — no similar keys in markets at all")
+            similar = [k for k in markets if coin.lower() in k.lower() or exchange_coin.lower() in k.lower()]
+            hint_str = ", ".join(similar[:5]) if similar else "no similar keys found"
+            logger.warning(f"[Coins] {coin} not found as '{ms}' — similar: {hint_str}")
             registry[coin] = CoinInfo(
                 symbol        = coin,
                 market_symbol = ms,
@@ -142,6 +140,7 @@ def build_registry(
                 min_notional  = 5.0,
                 max_amount    = 0.0,
                 max_leverage  = 0,
+                hint          = hint_str,
             )
 
     logger.info(

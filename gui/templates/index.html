@@ -1639,8 +1639,24 @@ function renderCoins(coins, stbc, exchange) {
     const levBadge = isHL && c.available && c.max_leverage
       ? `<span style="font-size:10px;color:var(--muted);margin-left:4px">${c.max_leverage}x</span>`
       : '';
-    return `<div style="${styles}">${icon} ${sym}${levBadge}</div>`;
+    const hintTip = !c.available && c.hint
+      ? ` title="Looked up: ${c.market_symbol || ''}\nSimilar: ${c.hint}"`
+      : '';
+    return `<div style="${styles}"${hintTip}>${icon} ${sym}${levBadge}</div>`;
   }).join('');
+
+  // ── Missing coins diagnostic ──────────────────────────────────────────────
+  const missing = entries.filter(([, c]) => !c.available && c.hint);
+  let diagEl = document.getElementById('coins-missing-diag');
+  if (!diagEl) {
+    diagEl = document.createElement('div');
+    diagEl.id = 'coins-missing-diag';
+    diagEl.style.cssText = 'margin-top:10px;font-size:11px;color:var(--muted);font-family:monospace';
+    card.appendChild(diagEl);
+  }
+  diagEl.innerHTML = missing.map(([sym, c]) =>
+    `<div>✗ <b>${sym}</b> — looked up: <code>${c.market_symbol||''}</code> · similar: <code>${c.hint}</code></div>`
+  ).join('');
 
   card.style.display = '';
 
