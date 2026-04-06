@@ -44,6 +44,7 @@ header {
 }
 header .logo { font-size: 21px; font-weight: 700; color: var(--accent); }
 header .sub  { color: var(--muted); font-size: 16px; }
+header .version { color: var(--muted); font-size: 12px; margin-left: 8px; }
 header .spacer { flex: 1; }
 #agent-status-badge {
   padding: 4px 12px;
@@ -445,6 +446,7 @@ input[type=range]::-webkit-slider-thumb {
 <header>
   <span class="logo">⚡ Quantilan</span>
   <span class="sub">Agent Setup</span>
+  <span class="version" id="agent-version"></span>
   <span class="spacer"></span>
   <span id="agent-status-badge" class="stopped">● Agent stopped</span>
 </header>
@@ -1065,6 +1067,13 @@ window.addEventListener('DOMContentLoaded', async () => {
   setInterval(refreshAgentStatus, 5000);
   // Auto-subscribe to logs if agent is already running when page loads
   if (agentRunning) { expandAgentLogs(); subscribeAgentLogs(); }
+  // Show version in header
+  try {
+    const vr = await fetch('/api/version');
+    const vd = await vr.json();
+    const el = document.getElementById('agent-version');
+    if (el) el.textContent = `v${vd.version} (${vd.build_date})`;
+  } catch {}
 });
 
 async function loadConfig() {

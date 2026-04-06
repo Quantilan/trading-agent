@@ -199,6 +199,12 @@ async def index():
     return HTMLResponse(tpl.read_text(encoding="utf-8"))
 
 
+@app.get("/api/version")
+async def get_version():
+    from agent.version import VERSION, BUILD_DATE
+    return {"version": VERSION, "build_date": BUILD_DATE}
+
+
 @app.get("/api/config")
 async def get_config():
     """Return current .env values. Sensitive fields are masked."""

@@ -93,6 +93,7 @@ def setup_logging(
     logging.getLogger("aiogram").setLevel(logging.WARNING)
     logging.getLogger("asyncio").setLevel(logging.WARNING)
     logging.getLogger("websockets").setLevel(logging.WARNING)
+    logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
     logging.getLogger(__name__).info(
         f"Logging started | level={level.upper()} | file={log_path}"
