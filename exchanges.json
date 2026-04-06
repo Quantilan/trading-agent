@@ -51,11 +51,11 @@
       "defaultSlippage": 0.5
     },
     "symbol_map": {
-      "PEPE":  "kPEPE",
-      "BONK":  "kBONK",
-      "SHIB":  "kSHIB",
-      "FLOKI": "kFLOKI",
-      "LUNC":  "kLUNC"
+      "PEPE":  "KPEPE",
+      "BONK":  "KBONK",
+      "SHIB":  "KSHIB",
+      "FLOKI": "KFLOKI",
+      "LUNC":  "KLUNC"
     }
   },
   "okx": {
