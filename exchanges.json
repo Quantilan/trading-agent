@@ -30,6 +30,13 @@
       "defaultType": "linear",
       "fetchCurrencies": false,
       "cache": false
+    },
+    "symbol_map": {
+      "PEPE":  "1000PEPE",
+      "BONK":  "1000BONK",
+      "SHIB":  "1000SHIB",
+      "FLOKI": "1000FLOKI",
+      "LUNC":  "1000LUNC"
     }
   },
   "hyperliquid": {
@@ -41,8 +48,15 @@
       "defaultType": "swap",
       "sandbox": false,
       "createMarketBuyOrderRequiresPrice": false,
-      "defaultSlippage": 0.5}
-  
+      "defaultSlippage": 0.5
+    },
+    "symbol_map": {
+      "PEPE":  "kPEPE",
+      "BONK":  "kBONK",
+      "SHIB":  "kSHIB",
+      "FLOKI": "kFLOKI",
+      "LUNC":  "kLUNC"
+    }
   },
   "okx": {
     "ccxt_id": "okx",
