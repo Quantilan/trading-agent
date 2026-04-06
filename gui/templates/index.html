@@ -2092,23 +2092,27 @@ function subscribeAgentLogs() {
   };
 }
 
-// ── Server keepalive ─────────────────────────────────────────────────────────
-(function startKeepalive() {
-  const es = new EventSource('/api/alive');
-  es.onerror = () => {
-    es.close();
-    const overlay = document.getElementById('server-stopped-overlay');
-    if (overlay) overlay.style.display = 'flex';
-    // Try to close the tab — works if browser permits it
+// ── Server keepalive (polling) ────────────────────────────────────────────────
+// Polling avoids a persistent SSE connection that blocks uvicorn graceful shutdown.
+(async function startKeepalive() {
+  while (true) {
+    await new Promise(r => setTimeout(r, 2000));
+    try {
+      const r = await fetch('/api/alive', {signal: AbortSignal.timeout(3000)});
+      if (!r.ok) break;
+    } catch {
+      break; // server gone
+    }
+  }
+  const overlay = document.getElementById('server-stopped-overlay');
+  if (overlay) overlay.style.display = 'flex';
+  setTimeout(() => {
+    window.close();
     setTimeout(() => {
-      window.close();
-      // If still here after 300ms, browser blocked it — show hint
-      setTimeout(() => {
-        const hint = document.getElementById('server-stopped-hint');
-        if (hint) hint.style.display = '';
-      }, 300);
-    }, 800);
-  };
+      const hint = document.getElementById('server-stopped-hint');
+      if (hint) hint.style.display = '';
+    }, 400);
+  }, 800);
 })();
 
 // ── Toast ────────────────────────────────────────────────────────────────────
