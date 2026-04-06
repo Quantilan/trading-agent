@@ -36,6 +36,7 @@ class CoinInfo:
     amount_step:   float  # minimum lot increment (floor amount to multiples of this)
     min_notional:  float  # minimum order value in stablecoin
     max_amount:    float  # maximum single order amount (0 = exchange has no limit)
+    max_leverage:  int    # maximum leverage allowed by exchange (0 = unknown/unlimited)
 
 
 def load_coins_list() -> List[str]:
@@ -107,10 +108,12 @@ def build_registry(
             amt_limits   = limits.get("amount")    or {}
             cost_limits  = limits.get("cost")      or {}
 
+            lev_limits   = limits.get("leverage")  or {}
             price_prec   = _price_digits(precision.get("price"))
             amount_step  = float(precision.get("amount") or 0.001)
             min_notional = float(cost_limits.get("min")  or 5.0)
             max_amount   = float(amt_limits.get("max")   or 0.0)
+            max_leverage = int(lev_limits.get("max")     or 0)
 
             registry[coin] = CoinInfo(
                 symbol        = coin,
@@ -120,6 +123,7 @@ def build_registry(
                 amount_step   = amount_step,
                 min_notional  = min_notional,
                 max_amount    = max_amount,
+                max_leverage  = max_leverage,
             )
             available += 1
         else:
@@ -131,6 +135,7 @@ def build_registry(
                 amount_step   = 0.001,
                 min_notional  = 5.0,
                 max_amount    = 0.0,
+                max_leverage  = 0,
             )
 
     logger.info(

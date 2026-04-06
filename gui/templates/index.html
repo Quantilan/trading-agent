@@ -310,6 +310,7 @@ input[type=range]::-webkit-slider-thumb {
 #toast.show { opacity: 1; transform: translateY(0); }
 #toast.ok   { border-color: var(--green); }
 #toast.fail { border-color: var(--red); }
+#toast.warn { border-color: var(--yellow); color: var(--yellow); }
 
 /* ── Agent log panel ── */
 #agent-console { height: 320px; }
@@ -1594,12 +1595,13 @@ function setChip(id, text, cls = 'idle') {
 // ── Coins block ──────────────────────────────────────────────────────────────
 const _TOP_COINS = new Set(['BTC', 'ETH', 'SOL']);
 
-function renderCoins(coins, stbc) {
+function renderCoins(coins, stbc, exchange) {
   const card   = document.getElementById('card-coins');
   const grid   = document.getElementById('coins-grid');
   const header = document.getElementById('coins-header-info');
   if (!card || !grid) return;
 
+  const isHL    = (exchange || '').toUpperCase() === 'HYPERLIQUID';
   const entries = Object.entries(coins).sort((a, b) => a[0].localeCompare(b[0]));
   const total   = entries.length;
   const avail   = entries.filter(([, c]) => c.available).length;
@@ -1609,6 +1611,7 @@ function renderCoins(coins, stbc) {
     `<span style="background:rgba(56,189,248,.15); color:#38bdf8; padding:1px 6px; border-radius:4px; font-weight:600; margin-right:4px">${stbc}</span>` +
     `<span>${avail}/${total} available` +
     (unavail > 0 ? ` · <span style="color:var(--red)">${unavail} missing</span>` : '') +
+    (isHL ? ` · <span style="color:var(--muted)">max lev shown</span>` : '') +
     `</span>`;
 
   grid.innerHTML = entries.map(([sym, c]) => {
@@ -1616,10 +1619,51 @@ function renderCoins(coins, stbc) {
     const color  = c.available ? '' : 'color:var(--muted)';
     const bold   = _TOP_COINS.has(sym) ? 'font-weight:700' : '';
     const styles = [color, bold].filter(Boolean).join(';');
-    return `<div style="${styles}">${icon} ${sym}</div>`;
+    const levBadge = isHL && c.available && c.max_leverage
+      ? `<span style="font-size:10px;color:var(--muted);margin-left:4px">${c.max_leverage}x</span>`
+      : '';
+    return `<div style="${styles}">${icon} ${sym}${levBadge}</div>`;
   }).join('');
 
   card.style.display = '';
+
+  // ── Hyperliquid leverage guard ─────────────────────────────────────────────
+  if (isHL) {
+    const levValues = entries
+      .filter(([, c]) => c.available && c.max_leverage > 0)
+      .map(([, c]) => c.max_leverage);
+
+    if (levValues.length > 0) {
+      const minMaxLev = Math.min(...levValues);
+      const levSlider = document.getElementById('LEVERAGE');
+      const levLabel  = document.getElementById('v-LEVERAGE');
+      const current   = parseInt(levSlider?.value || '5', 10);
+
+      if (levSlider && current > minMaxLev) {
+        // Find which coins are the bottleneck
+        const limited = entries
+          .filter(([, c]) => c.available && c.max_leverage > 0 && c.max_leverage === minMaxLev)
+          .map(([sym]) => sym).join(', ');
+
+        levSlider.value    = minMaxLev;
+        levLabel.textContent = minMaxLev + 'x';
+
+        showToast(
+          `⚠️ Leverage capped to ${minMaxLev}x — limit on Hyperliquid for: ${limited}`,
+          'warn'
+        );
+
+        // Auto-save the capped leverage to .env
+        fetch('/api/save', {
+          method:  'POST',
+          headers: {'Content-Type': 'application/json'},
+          body:    JSON.stringify({fields: collectFields()}),
+        }).then(r => r.json()).then(d => {
+          if (d.ok) showToast(`💾 Leverage ${minMaxLev}x saved to .env`, 'ok');
+        });
+      }
+    }
+  }
 }
 
 // ── Test Connection ──────────────────────────────────────────────────────────
@@ -1647,7 +1691,7 @@ async function testConnection() {
       markTest('connection', true);
       showToast('✅ Connection successful', 'ok');
       if (hint) hint.style.display = 'none';
-      if (d.coins) renderCoins(d.coins, d.stbc);
+      if (d.coins) renderCoins(d.coins, d.stbc, d.exchange);
     } else {
       setChip('ci-exchange', '❌ ' + d.error, 'fail');
       setChip('ci-balance',  '—');

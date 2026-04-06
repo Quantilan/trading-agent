@@ -340,6 +340,7 @@ async def test_connection(req: TestConnectionRequest):
                     "min_notional": c.min_notional,
                     "amount_step":  c.amount_step,
                     "max_amount":   c.max_amount,
+                    "max_leverage": c.max_leverage,
                 }
                 for sym, c in executor.coins.items()
             } if executor.coins else {}
@@ -363,6 +364,7 @@ async def test_connection(req: TestConnectionRequest):
                 "min_notional": c.min_notional,
                 "amount_step":  c.amount_step,
                 "max_amount":   c.max_amount,
+                "max_leverage": c.max_leverage,
             }
             for sym, c in executor.coins.items()
         } if executor.coins else {}
