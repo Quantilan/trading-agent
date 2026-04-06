@@ -387,6 +387,28 @@ Supported actions: **LONG / SHORT / FLAT / MODIFY_SL / MODIFY_TP**
 
 ---
 
+## Exchange Symbol Mapping
+
+Some exchanges use non-standard ticker names for low-price tokens. For example, Binance futures lists PEPE as `1000PEPE` (one contract = 1000 tokens). The agent handles this transparently — everywhere in signals, `coins.json`, and notifications you use the standard name (`PEPE`), and the exchange-specific name is applied automatically at execution time.
+
+Mappings are configured in `exchanges.json` per exchange:
+
+```json
+"binance": {
+  "symbol_map": {
+    "PEPE":  "1000PEPE",
+    "BONK":  "1000BONK",
+    "SHIB":  "1000SHIB",
+    "FLOKI": "1000FLOKI",
+    "LUNC":  "1000LUNC"
+  }
+}
+```
+
+If a coin is not in `symbol_map`, its name is used as-is. Other exchanges (Bybit, OKX, Hyperliquid) do not require a map for these tokens.
+
+---
+
 ## Project Structure
 
 ```

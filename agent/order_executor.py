@@ -705,7 +705,8 @@ class OrderExecutor:
         try:
             coin_list  = load_coins_list()
             stbc       = self.config.stbc or "USDT"
-            self.coins = build_registry(coin_list, self._markets, stbc)
+            symbol_map = _EXCHANGE_PARAMS.get(self.config.exchange, {}).get("symbol_map", {})
+            self.coins = build_registry(coin_list, self._markets, stbc, symbol_map)
         except Exception as e:
             logger.warning(f"[Coins] _init_coins failed: {e}")
             self.coins = {}

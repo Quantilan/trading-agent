@@ -65,22 +65,28 @@ def load_coins_list() -> List[str]:
 
 
 def build_registry(
-    coins:   List[str],
-    markets: dict,
-    stbc:    str,
+    coins:      List[str],
+    markets:    dict,
+    stbc:       str,
+    symbol_map: Dict[str, str] = None,
 ) -> Dict[str, "CoinInfo"]:
     """
     Match each coin against loaded exchange markets and return a registry.
 
     Args:
-        coins:   base symbols, e.g. ["BTC", "ETH"]
-        markets: ccxt markets dict (exchange.markets after load_markets())
-        stbc:    stablecoin, e.g. "USDT"
+        coins:      base symbols, e.g. ["BTC", "ETH", "PEPE"]
+        markets:    ccxt markets dict (exchange.markets after load_markets())
+        stbc:       stablecoin, e.g. "USDT"
+        symbol_map: exchange-specific overrides from exchanges.json,
+                    e.g. {"PEPE": "1000PEPE"} for Binance.
+                    If coin is in the map, the mapped name is used to look up
+                    the market — but the registry key stays as the original name.
 
     Returns:
         dict  symbol → CoinInfo  (both available and unavailable coins are included)
     """
-    registry: Dict[str, CoinInfo] = {}
+    registry:   Dict[str, CoinInfo] = {}
+    symbol_map  = symbol_map or {}
 
     def _price_digits(val, default: int = 2) -> int:
         """Convert ccxt price precision float (e.g. 0.01) to decimal digit count (2)."""
@@ -91,7 +97,8 @@ def build_registry(
 
     available = 0
     for coin in coins:
-        ms     = f"{coin}/{stbc}:{stbc}"
+        exchange_coin = symbol_map.get(coin, coin)   # PEPE → 1000PEPE on Binance
+        ms     = f"{exchange_coin}/{stbc}:{stbc}"
         market = markets.get(ms)
 
         if market:

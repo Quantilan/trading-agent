@@ -11,6 +11,13 @@
       "fetchCurrencies": false,
       "cache": false,
       "warmup": false
+    },
+    "symbol_map": {
+      "PEPE":  "1000PEPE",
+      "BONK":  "1000BONK",
+      "SHIB":  "1000SHIB",
+      "FLOKI": "1000FLOKI",
+      "LUNC":  "1000LUNC"
     }
   },
   "bybit": {
