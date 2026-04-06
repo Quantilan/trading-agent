@@ -21,8 +21,9 @@ _COINS_FILE = _ROOT / "coins.json"
 
 _BUILTIN_COINS: List[str] = [
     "BTC", "ETH", "BNB", "SOL", "XRP", "DOGE", "ADA", "AVAX", "TRX", "DOT",
-    "LINK", "MATIC", "LTC", "BCH", "NEAR", "APT", "UNI", "ICP", "ARB", "OP",
-    "INJ", "SUI", "ATOM", "FIL", "HBAR", "AAVE", "VET", "XLM", "TON", "ETC",
+    "LINK", "POL", "LTC", "BCH", "NEAR", "APT", "UNI", "ICP", "ARB", "OP",
+    "INJ", "SUI", "ATOM", "HBAR", "AAVE", "TON", "ETC", "LDO", "ENA", "PEPE",
+    "TIA", "TAO", "ONDO",
 ]
 
 
