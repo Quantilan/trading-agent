@@ -138,6 +138,7 @@ class OrderExecutor:
         self.is_one_way    = False  # set after connect()
         self.coins: dict   = {}     # symbol → CoinInfo, populated in _init_coins()
         self._price_cache: dict = {}  # symbol → last known price (fast fallback)
+        self._bg_refresh_task: Optional[asyncio.Task] = None
 
     # ─────────────────────────────────────
     # CONNECT
@@ -176,6 +177,13 @@ class OrderExecutor:
         return True
 
     async def disconnect(self) -> None:
+        if self._bg_refresh_task and not self._bg_refresh_task.done():
+            self._bg_refresh_task.cancel()
+            try:
+                await self._bg_refresh_task
+            except asyncio.CancelledError:
+                pass
+            self._bg_refresh_task = None
         if self.pro_exchange:
             try:
                 await self.pro_exchange.close()
@@ -278,7 +286,7 @@ class OrderExecutor:
                 f"(age {int(cache_age)}s, next refresh in {_HL_CACHE_TTL - int(cache_age)}s)"
             )
             # Refresh in background so cache stays warm
-            asyncio.create_task(self._refresh_hl_markets_bg())
+            self._bg_refresh_task = asyncio.create_task(self._refresh_hl_markets_bg())
         else:
             # Slow path — full fetch, then save to disk
             t0 = time.monotonic()

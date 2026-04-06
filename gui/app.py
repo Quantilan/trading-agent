@@ -689,6 +689,17 @@ async def agent_stop():
     return {"ok": True}
 
 
+@app.get("/api/alive")
+async def alive():
+    """SSE heartbeat — client detects server shutdown when this stream closes."""
+    async def gen():
+        while True:
+            yield "data: ok\n\n"
+            await asyncio.sleep(2)
+    return StreamingResponse(gen(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
 @app.get("/api/agent/logs")
 async def agent_logs():
     """SSE stream of agent stdout lines."""

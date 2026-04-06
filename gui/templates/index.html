@@ -1031,6 +1031,23 @@ input[type=range]::-webkit-slider-thumb {
 <!-- Toast -->
 <div id="toast"></div>
 
+<div id="server-stopped-overlay" style="
+  display:none; position:fixed; inset:0; z-index:9999;
+  background:rgba(0,0,0,.75); backdrop-filter:blur(4px);
+  align-items:center; justify-content:center; flex-direction:column; gap:16px;
+">
+  <div style="font-size:32px">🔌</div>
+  <div style="font-size:18px; font-weight:700; color:var(--text)">Server stopped</div>
+  <div style="font-size:13px; color:var(--muted)">Quantilan GUI has been shut down (Ctrl+C)</div>
+  <button onclick="window.close()" style="
+    margin-top:8px; padding:8px 24px; border-radius:6px;
+    background:var(--accent); color:#fff; border:none; cursor:pointer; font-size:14px;
+  ">Close tab</button>
+  <div id="server-stopped-hint" style="font-size:11px; color:var(--muted); display:none">
+    Browser blocked auto-close — you can close this tab manually.
+  </div>
+</div>
+
 <script>
 // ── State ───────────────────────────────────────────────────────────────────
 const validationCache = {};
@@ -2074,6 +2091,25 @@ function subscribeAgentLogs() {
     cons.scrollTop = cons.scrollHeight;
   };
 }
+
+// ── Server keepalive ─────────────────────────────────────────────────────────
+(function startKeepalive() {
+  const es = new EventSource('/api/alive');
+  es.onerror = () => {
+    es.close();
+    const overlay = document.getElementById('server-stopped-overlay');
+    if (overlay) overlay.style.display = 'flex';
+    // Try to close the tab — works if browser permits it
+    setTimeout(() => {
+      window.close();
+      // If still here after 300ms, browser blocked it — show hint
+      setTimeout(() => {
+        const hint = document.getElementById('server-stopped-hint');
+        if (hint) hint.style.display = '';
+      }, 300);
+    }, 800);
+  };
+})();
 
 // ── Toast ────────────────────────────────────────────────────────────────────
 let _toastTimer = null;
