@@ -139,10 +139,13 @@ def _unmask_fields(fields: Dict[str, str]) -> Dict[str, str]:
 def _build_config(fields: Dict[str, str]):
     """Build AgentConfig from form fields dict."""
     from agent.config import AgentConfig
-    stbc = fields.get("EXCHANGE_STBC", "").strip()
     ex   = fields.get("EXCHANGE", "binance").lower()
-    if not stbc:
-        stbc = "USDC" if ex == "hyperliquid" else "USDT"
+    stbc = fields.get("EXCHANGE_STBC", "").strip()
+    # Hyperliquid settles exclusively in USDC — override whatever is in .env
+    if ex == "hyperliquid":
+        stbc = "USDC"
+    elif not stbc:
+        stbc = "USDT"
 
     return AgentConfig(
         exchange         = ex,
